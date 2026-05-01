@@ -1,0 +1,225 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isAdmin() { 
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == 'diamond.entertainment70@gmail.com' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['Admin', 'Super Admin']
+      );
+    }
+    
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    function isValidId(id) { 
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); 
+    }
+
+    // --- Validation Helpers ---
+    
+    function isValidUser(data) {
+      return data.username is string && data.username.size() >= 3 && data.username.size() <= 24 &&
+             data.role in ['User', 'Moderator', 'Admin', 'Super Admin', 'Forum Moderator', 'Server Manager'] &&
+             data.uid is string &&
+             (data.get('permissions', null) == null || data.permissions is map);
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isStaff() {
+      let data = getUserData();
+      return isSignedIn() && (
+        data.role in ['Moderator', 'Admin', 'Super Admin', 'Forum Moderator', 'Server Manager'] ||
+        (data.permissions != null && (
+          data.permissions.canEditForums == true || 
+          data.permissions.canManageServer == true ||
+          data.permissions.canManageUsers == true ||
+          data.permissions.canPostAnnouncements == true ||
+          data.permissions.canManageEvents == true
+        ))
+      );
+    }
+
+    function isForumStaff() {
+      let data = getUserData();
+      return isSignedIn() && (
+        data.role in ['Moderator', 'Admin', 'Super Admin', 'Forum Moderator'] ||
+        (data.permissions != null && data.permissions.canEditForums == true)
+      );
+    }
+
+    function isServerStaff() {
+      let data = getUserData();
+      return isSignedIn() && (
+        data.role in ['Admin', 'Super Admin', 'Server Manager'] ||
+        (data.permissions != null && data.permissions.canManageServer == true)
+      );
+    }
+
+    function isUserStaff() {
+      let data = getUserData();
+      return isSignedIn() && (
+        data.role in ['Admin', 'Super Admin'] ||
+        (data.permissions != null && data.permissions.canManageUsers == true)
+      );
+    }
+
+    function isNotBanned() {
+      return isSignedIn() && !exists(/databases/$(database)/documents/bans/$(request.auth.uid));
+    }
+
+    function isAnnouncementStaff() {
+      let data = getUserData();
+      return isSignedIn() && (
+        data.role in ['Admin', 'Super Admin'] ||
+        (data.permissions != null && data.permissions.canPostAnnouncements == true)
+      );
+    }
+
+    function isValidThread(data) {
+      return data.title is string && data.title.size() >= 5 && data.title.size() <= 100 &&
+             data.authorId == request.auth.uid &&
+             data.forumId is string &&
+             data.createdAt == request.time;
+    }
+
+    function isValidPost(data) {
+      return data.content is string && data.content.size() >= 1 && data.content.size() <= 10000 &&
+             data.authorId == request.auth.uid &&
+             data.threadId is string &&
+             data.createdAt == request.time;
+    }
+
+    // --- Collections ---
+
+    // Users
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isStaff() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      
+      allow create: if isNotBanned() && isOwner(userId) && isValidUser(incoming()) && 
+                    (incoming().role == 'User' || incoming().role == 'user');
+      
+      allow update: if (
+        isUserStaff() ||
+        (isNotBanned() && isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['username', 'skin']))
+      ) && isValidUser(incoming());
+    }
+
+    // Bans
+    match /bans/{userId} {
+      allow read: if isSignedIn();
+      allow write: if isUserStaff();
+    }
+
+    // Settings
+    match /settings/{id} {
+      allow read: if true;
+      allow write: if isServerStaff();
+    }
+
+    // Reports
+    match /reports/{id} {
+      allow read: if isStaff();
+      allow create: if isNotBanned();
+      allow update: if isStaff();
+    }
+
+    // Activity Logs
+    match /activity_logs/{logId} {
+      allow read: if isStaff();
+      allow create: if isStaff();
+    }
+
+    // Ban Appeals
+    match /ban_appeals/{appealId} {
+      allow read: if isStaff() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create: if isNotBanned();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Admins (Seed collection)
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+      allow write: if false; // Only manageable via console
+    }
+
+    // Announcements
+    match /announcements/{id} {
+      allow read: if true;
+      allow write: if isAnnouncementStaff();
+    }
+
+    // Server Status
+    match /server_status/{id} {
+      allow read: if true;
+      allow write: if isServerStaff(); // Usually updated by a backend service
+    }
+
+    // Events
+    match /events/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    match /event_categories/{id} {
+      allow read: if true;
+      allow write: if isStaff();
+    }
+
+    // Forum Categories
+    match /categories/{id} {
+      allow read: if true;
+      allow write: if isForumStaff();
+    }
+
+    // Forums
+    match /forums/{forumId} {
+      allow read: if true;
+      allow write: if isForumStaff();
+      
+      // Threads
+      match /threads/{threadId} {
+        allow read: if true;
+        allow create: if isNotBanned() && isValidThread(incoming()) && 
+                      exists(/databases/$(database)/documents/forums/$(forumId));
+        
+        allow update: if (
+          isAdmin() || isForumStaff() ||
+          (isNotBanned() && isOwner(existing().authorId) && !existing().locked && 
+           incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'updatedAt', 'sticky', 'locked']))
+        );
+        
+        allow delete: if isAdmin() || isForumStaff();
+      }
+    }
+
+    // Thread Posts (Replies)
+    match /threads/{threadId}/posts/{postId} {
+      allow read: if true;
+      allow create: if isNotBanned();
+      
+      allow update: if (
+        isAdmin() || isForumStaff() ||
+        (isNotBanned() && isOwner(existing().authorId) && 
+         incoming().diff(existing()).affectedKeys().hasOnly(['content', 'updatedAt']))
+      );
+      
+      allow delete: if isAdmin() || isForumStaff();
+    }
+  }
+}

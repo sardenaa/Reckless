@@ -1,0 +1,259 @@
+{
+  "entities": {
+    "Announcement": {
+      "title": "Community Announcement",
+      "description": "News and updates for the community.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "author": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "content", "author", "createdAt"]
+    },
+    "ServerStatus": {
+      "title": "Game Server Status",
+      "description": "Real-time status of the SA-MP/Open.mp server.",
+      "type": "object",
+      "properties": {
+        "ip": { "type": "string" },
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["online", "offline"] },
+        "playerCount": { "type": "number" },
+        "maxPlayers": { "type": "number" },
+        "lastSeen": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ip", "name", "status"]
+    },
+    "User": {
+      "title": "Player Profile",
+      "description": "Main character data and account info.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["user", "moderator", "admin"] },
+        "permissions": {
+          "type": "object",
+          "properties": {
+            "canEditForums": { "type": "boolean" },
+            "canManageServer": { "type": "boolean" },
+            "canManageUsers": { "type": "boolean" },
+            "canPostAnnouncements": { "type": "boolean" },
+            "canManageEvents": { "type": "boolean" }
+          }
+        },
+        "money": { "type": "number" },
+        "bank": { "type": "number" },
+        "materials": { "type": "number" },
+        "level": { "type": "number" },
+        "playingHours": { "type": "number" },
+        "kills": { "type": "number" },
+        "deaths": { "type": "number" },
+        "crimes": { "type": "number" },
+        "arrests": { "type": "number" },
+        "job": { "type": "string" },
+        "faction": { "type": "string" },
+        "skin": { "type": "number" },
+        "donatorTier": { "type": "number" },
+        "donatorExpiry": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "username", "role", "money", "level"]
+    },
+    "Report": {
+      "title": "Player Report",
+      "description": "A report filed against a player.",
+      "type": "object",
+      "properties": {
+        "targetUid": { "type": "string" },
+        "targetUsername": { "type": "string" },
+        "reason": { "type": "string" },
+        "reportedBy": { "type": "string" },
+        "reportedByName": { "type": "string" },
+        "status": { "type": "string", "enum": ["Open", "In Progress", "Resolved"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Warning": {
+      "title": "Player Warning",
+      "description": "A warning issued to a player for rules violation.",
+      "type": "object",
+      "properties": {
+        "targetUid": { "type": "string" },
+        "reason": { "type": "string" },
+        "issuedBy": { "type": "string" },
+        "issuedByName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Ban": {
+      "title": "Player Ban",
+      "description": "A ban record for a player.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "username": { "type": "string" },
+        "reason": { "type": "string" },
+        "duration": { "type": "string" },
+        "bannedBy": { "type": "string" },
+        "bannedByName": { "type": "string" },
+        "bannedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "BanAppeal": {
+      "title": "Ban Appeal",
+      "description": "An appeal from a banned player.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "reason": { "type": "string" },
+        "appealText": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Denied"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "reviewedBy": { "type": "string" },
+        "reviewedByName": { "type": "string" }
+      }
+    },
+    "ModerationLog": {
+      "title": "Moderation Log",
+      "description": "Global log of all administrative actions.",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["Warning", "Mute", "Ban", "Unban", "Role Change", "Sanction Lifted"] },
+        "targetUid": { "type": "string" },
+        "targetUsername": { "type": "string" },
+        "actionBy": { "type": "string" },
+        "actionByName": { "type": "string" },
+        "details": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Mute": {
+      "title": "Player Mute",
+      "description": "A record of a player being muted from communication.",
+      "type": "object",
+      "properties": {
+        "targetUid": { "type": "string" },
+        "targetUsername": { "type": "string" },
+        "reason": { "type": "string" },
+        "duration": { "type": "string" },
+        "issuedBy": { "type": "string" },
+        "issuedByName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Vehicle": {
+      "title": "Player Vehicle",
+      "description": "A vehicle owned by a player.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "model": { "type": "string" },
+        "plate": { "type": "string" },
+        "color": { "type": "string" }
+      }
+    },
+    "Property": {
+      "title": "Player Property",
+      "description": "A property owned by a player.",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "location": { "type": "string" },
+        "price": { "type": "number" }
+      }
+    },
+    "ForumCategory": {
+      "title": "Forum Category",
+      "description": "Groupings for forums.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "order": { "type": "number" }
+      }
+    },
+    "Forum": {
+      "title": "Forum Section",
+      "description": "A specific forum section for threads.",
+      "type": "object",
+      "properties": {
+        "categoryId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "threadCount": { "type": "number" },
+        "postCount": { "type": "number" },
+        "order": { "type": "number" }
+      }
+    },
+    "Thread": {
+      "title": "Forum Thread",
+      "description": "A thread within a forum.",
+      "type": "object",
+      "properties": {
+        "forumId": { "type": "string" },
+        "title": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "sticky": { "type": "boolean" },
+        "locked": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Post": {
+      "title": "Thread Post",
+      "description": "A reply in a thread.",
+      "type": "object",
+      "properties": {
+        "threadId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Event": {
+      "title": "In-Game Event",
+      "description": "Scheduled in-game events and activities.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "type": { "type": "string" },
+        "description": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" },
+        "location": { "type": "string" },
+        "prize": { "type": "string" },
+        "playerCount": { "type": "number" },
+        "createdBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["scheduled", "active", "completed", "cancelled"] }
+      },
+      "required": ["title", "type", "startTime", "createdBy", "createdAt", "status"]
+    }
+  },
+  "firestore": {
+    "announcements": { "schema": "Announcement", "description": "Latest community news" },
+    "server_status": { "schema": "ServerStatus", "description": "Real-time server metrics" },
+    "users": { "schema": "User", "description": "Global player accounts" },
+    "categories": { "schema": "ForumCategory", "description": "Forum grouping" },
+    "forums": { "schema": "Forum", "description": "Forum sub-sections" },
+    "forums/{forumId}/threads": { "schema": "Thread", "description": "Threads within a forum" },
+    "threads/{threadId}/posts": { "schema": "Post", "description": "Replies in a thread" },
+    "events": { "schema": "Event", "description": "Scheduled community events" },
+    "event_categories": { "schema": { "type": "object", "properties": { "name": { "type": "string" } } }, "description": "Custom categories for events" },
+    "reports": { "schema": "Report", "description": "Player report queue" },
+    "warnings": { "schema": "Warning", "description": "History of player warnings" },
+    "mutes": { "schema": "Mute", "description": "History of player mutes" },
+    "bans": { "schema": "Ban", "description": "Active and past server bans" },
+    "ban_appeals": { "schema": "BanAppeal", "description": "Player ban appeals" },
+    "moderation_logs": { "schema": "ModerationLog", "description": "Administrative history log" },
+    "vehicles": { "schema": "Vehicle", "description": "All registered player vehicles" },
+    "properties": { "schema": "Property", "description": "All registered player properties" }
+  }
+}
