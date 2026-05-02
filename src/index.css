@@ -1,38 +1,38 @@
-@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Chakra+Petch:wght@300;500;700&family=JetBrains+Mono:wght@400;700&family=Permanent+Marker&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&family=Permanent+Marker&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Chakra Petch", ui-sans-serif, system-ui, sans-serif;
-  --font-display: "Bebas Neue", sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
   --font-marker: "Permanent Marker", cursive;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 @layer base {
   :root {
-    --bg-color: #0c0d10;
-    --card-bg: #1a1c23;
-    --border-color: #2d313d;
+    --bg-color: #f8fafc;
+    --card-bg: #ffffff;
+    --border-color: #e2e8f0;
     --accent: #f27d26; /* GTA Orange */
-    --accent-secondary: #38bdf8; /* Cyan HUD */
-    --text-primary: #f8fafc;
-    --text-secondary: #94a3b8;
-    --line: #1e293b;
-    --header-bg: #0c0d10;
-    --glow: rgba(242, 125, 38, 0.4);
+    --accent-secondary: #0ea5e9; /* Cyan HUD */
+    --text-primary: #0f172a;
+    --text-secondary: #64748b;
+    --line: #cbd5e1;
+    --header-bg: #ffffff;
+    --glow: rgba(242, 125, 38, 0.2);
     --wanted-star: #fbbf24;
   }
 
-  :root.dark {
-    --bg-color: #0c0d10;
-    --card-bg: #1a1c23;
-    --border-color: #2d313d;
+  .dark {
+    --bg-color: #030405;
+    --card-bg: #0c0d0f;
+    --border-color: #1a1b1f;
     --accent: #f27d26;
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
-    --line: #1e293b;
-    --header-bg: #0c0d10;
-    --glow: rgba(242, 125, 38, 0.5);
+    --line: #121316;
+    --header-bg: #030405;
+    --glow: rgba(242, 125, 38, 0.4);
   }
 
   body {
@@ -41,55 +41,58 @@
     font-family: var(--font-sans);
     transition: background-color 0.3s ease, color 0.3s ease;
     background-image: 
-      radial-gradient(circle at 50% 0%, rgba(242, 125, 38, 0.05) 0%, transparent 70%),
-      radial-gradient(circle at 100% 100%, rgba(56, 189, 248, 0.03) 0%, transparent 50%);
-    @apply antialiased;
+      radial-gradient(circle at 50% -20%, rgba(242, 125, 38, 0.08) 0%, transparent 80%),
+      radial-gradient(circle at 100% 100%, rgba(14, 165, 233, 0.03) 0%, transparent 60%);
+    @apply antialiased selection:bg-(--accent) selection:text-white;
   }
 
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-display);
-    @apply uppercase tracking-[0.05em] font-normal;
+    @apply uppercase tracking-tight font-bold;
   }
 }
 
 @utility vbulletin-table {
   @apply w-full border-collapse overflow-hidden;
   & thead {
-    @apply bg-black/60 border-y border-white/10;
+    @apply bg-black/40 border-y border-white/5;
   }
   & th {
-    @apply p-4 text-[11px] uppercase tracking-[0.2em] font-black text-gray-500 text-left;
+    @apply p-4 text-[10px] uppercase tracking-[0.2em] font-black text-gray-500 text-left;
   }
   & td {
-    @apply border-b border-white/5 p-4 text-sm align-middle bg-black/20;
+    @apply border-b border-white/5 p-4 text-sm align-middle bg-black/10;
   }
 }
 
 @utility portal-card {
-  @apply bg-(--card-bg) border border-(--border-color) relative overflow-hidden;
-  &::after {
+  @apply bg-(--card-bg) border border-(--border-color) relative overflow-hidden transition-all duration-300;
+  &::before {
     content: '';
-    @apply absolute top-0 right-0 w-8 h-8 bg-white/5 rotate-45 translate-x-4 -translate-y-4;
+    @apply absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-(--accent) to-transparent opacity-0 transition-opacity duration-500;
+  }
+  &:hover::before {
+    @apply opacity-40;
   }
 }
 
 @utility portal-header {
-  @apply bg-gradient-to-r from-black/60 to-transparent px-6 py-4 text-2xl uppercase font-normal tracking-[0.1em] flex items-center justify-between border-l-4 border-(--accent) text-white font-display italic;
+  @apply bg-black/50 px-6 py-4 text-xl uppercase font-bold tracking-widest flex items-center justify-between border-l-4 border-(--accent) text-white font-display;
 }
 
 @utility gta-button {
-  @apply relative overflow-hidden px-8 py-3 bg-white text-black font-display text-xl uppercase tracking-widest transition-all duration-300 hover:bg-(--accent) hover:text-white active:scale-95 disabled:opacity-50 disabled:pointer-events-none italic transform -skew-x-12;
+  @apply relative overflow-hidden px-8 py-3 bg-white text-black font-display text-xl font-bold uppercase tracking-widest transition-all duration-300 hover:bg-(--accent) hover:text-white active:scale-95 disabled:opacity-50 disabled:pointer-events-none italic transform -skew-x-12;
   & span {
     @apply inline-block skew-x-12;
   }
 }
 
 @utility hud-box {
-  @apply bg-black/80 backdrop-blur-xl border-l-4 border-(--accent-secondary) p-4 shadow-2xl;
+  @apply bg-black/80 backdrop-blur-md border-l-2 border-(--accent-secondary) p-5 shadow-2xl;
 }
 
 @utility wanted-star {
-  @apply text-(--wanted-star) drop-shadow-[0_0_8px_rgba(251,191,36,0.6)];
+  @apply text-(--wanted-star) drop-shadow-[0_0_10px_rgba(251,191,36,0.5)];
 }
 
 @keyframes scanline {
@@ -98,21 +101,29 @@
 }
 
 .scanline {
-  width: 100%;
-  height: 100px;
-  background: linear-gradient(to bottom, transparent, rgba(242, 125, 38, 0.05), transparent);
-  position: absolute;
-  top: 0;
-  left: 0;
-  pointer-events: none;
-  animation: scanline 8s linear infinite;
-  z-index: 100;
+  @apply fixed inset-0 pointer-events-none z-50 overflow-hidden opacity-20;
+  background: linear-gradient(to bottom, transparent 50%, rgba(0,0,0,0.1) 50.5%, transparent 51%);
+  background-size: 100% 4px;
 }
 
 @utility neon-shadow {
-  box-shadow: 0 0 25px var(--glow);
+  box-shadow: 0 0 30px var(--glow);
 }
 
 @utility neon-text {
-  text-shadow: 0 0 15px var(--glow);
+  text-shadow: 0 0 10px var(--glow);
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
 }

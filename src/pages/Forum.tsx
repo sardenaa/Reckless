@@ -1,7 +1,8 @@
 import { Routes, Route, Link, useParams, useNavigate } from "react-router-dom";
-import { MessageSquare, Pin, Lock, User, Clock, ChevronRight, Send, AlertCircle, FileText, Search, Unlock, Trash2, ShieldAlert, X, VolumeX } from "lucide-react";
+import { MessageSquare, Pin, Lock, User, Clock, ChevronRight, Send, AlertCircle, FileText, Search, Unlock, Trash2, ShieldAlert, X, VolumeX, Eye, Users, LayoutDashboard } from "lucide-react";
 import { motion } from "motion/react";
 import React, { useState, useEffect, useMemo } from "react";
+import Markdown from "react-markdown";
 import { db, auth } from "../lib/firebase";
 import { 
   collection, 
@@ -17,7 +18,8 @@ import {
   limit,
   updateDoc,
   deleteDoc,
-  increment
+  increment,
+  collectionGroup
 } from "firebase/firestore";
 import { clsx } from "clsx";
 import { useToast } from "../components/Toast";
@@ -79,8 +81,8 @@ export default function Forum() {
       <div className="flex items-center gap-4 mb-2">
         <div className="w-1.5 h-10 bg-(--accent) shadow-[0_0_15px_var(--glow)]" />
         <div className="flex flex-col">
-          <h1 className="text-3xl font-black uppercase tracking-tighter italic font-display">PUBLIC MATRIX</h1>
-          <span className="text-[9px] font-mono tracking-[0.4em] opacity-40 uppercase -mt-1">Communication Log: ReckLess Network</span>
+          <h1 className="text-3xl font-black uppercase tracking-tighter italic font-display">Community Forum</h1>
+          <span className="text-[9px] font-mono tracking-[0.4em] opacity-40 uppercase -mt-1">ReckLess RolePlay Gaming Forum</span>
         </div>
       </div>
 
@@ -88,7 +90,7 @@ export default function Forum() {
         <div className="bg-blue-500/10 border border-blue-500 p-4 mb-2 flex items-center gap-4 text-blue-500 animate-pulse">
           <VolumeX size={24} />
           <div className="flex flex-col">
-            <h4 className="text-xs font-black uppercase tracking-widest">Communication Restricted</h4>
+            <h4 className="text-xs font-black uppercase tracking-widest">Account Muted</h4>
             <p className="text-[10px] font-bold uppercase opacity-80">You are currently muted for: <span className="text-white italic">{muteData?.reason}</span>. This restriction is active.</p>
           </div>
         </div>
@@ -110,6 +112,9 @@ function ForumIndex() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const [stats, setStats] = useState({ threads: 0, posts: 0, members: 0, newestUser: "" });
+  const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
+
   useEffect(() => {
     const qCat = query(collection(db, "categories"), orderBy("order", "asc"));
     const unsubCat = onSnapshot(qCat, (snap) => {
@@ -122,13 +127,30 @@ function ForumIndex() {
       setLoading(false);
     });
 
+    // Statistics fetching
+    const unsubStats = onSnapshot(doc(db, "settings", "forum_stats"), (snap) => {
+      if (snap.exists()) {
+        setStats(snap.data() as any);
+      }
+    });
+
+    // Online users fetching (last 15 mins activity)
+    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const qOnline = query(collection(db, "users"), where("lastActive", ">", fifteenMinsAgo), limit(50));
+    const unsubOnline = onSnapshot(qOnline, (snap) => {
+       setOnlineUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    });
+
     return () => {
       unsubCat();
       unsubForums();
+      unsubStats();
+      unsubOnline();
     };
   }, []);
 
-  const filteredForums = forums.filter(f => 
+  const topLevelForums = forums.filter(f => !f.parentForumId);
+  const filteredForums = topLevelForums.filter(f => 
     f.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
     f.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -173,19 +195,75 @@ function ForumIndex() {
         </div>
       )}
 
+      {/* Forum Statistics & Recent Activity */}
+      <div className="grid md:grid-cols-3 gap-6">
+        <div className="md:col-span-2 flex flex-col gap-6">
+           <div className="portal-card">
+              <div className="portal-header flex items-center gap-2">
+                 <Clock size={14} className="text-(--accent)" /> Recent Activity
+              </div>
+              <div className="p-0">
+                 <RecentActivityList />
+              </div>
+           </div>
+
+           <div className="portal-card">
+              <div className="portal-header flex items-center gap-2">
+                 <Users size={14} className="text-(--accent)" /> Users Currently Online
+              </div>
+              <div className="p-6">
+                 <div className="flex flex-wrap gap-x-2 gap-y-1">
+                    {onlineUsers.length === 0 ? (
+                      <span className="text-[10px] font-bold uppercase text-gray-700 italic">No users active in last 15 minutes.</span>
+                    ) : onlineUsers.map((u, i) => (
+                      <React.Fragment key={u.id}>
+                        <Link to={`/profile/${u.id}`} className={clsx(
+                           "text-[10px] font-black uppercase hover:underline transition-colors",
+                           ['Admin', 'Super Admin'].includes(u.role) ? "text-red-500" : 
+                           ['Moderator', 'Forum Moderator'].includes(u.role) ? "text-blue-500" :
+                           "text-gray-400"
+                        )}>
+                           {u.username}
+                        </Link>
+                        {i < onlineUsers.length - 1 && <span className="text-gray-800 text-[10px]">•</span>}
+                      </React.Fragment>
+                    ))}
+                 </div>
+                 <div className="mt-4 pt-4 border-t border-white/5 flex gap-6 text-[8px] font-black uppercase tracking-widest text-gray-700">
+                    <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-red-500 rounded-full" /> Administrator</div>
+                    <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-blue-500 rounded-full" /> Moderator</div>
+                    <div className="flex items-center gap-1.5"><div className="w-1.5 h-1.5 bg-gray-500 rounded-full" /> Member</div>
+                 </div>
+              </div>
+           </div>
+        </div>
+        <div className="flex flex-col gap-6">
+           <div className="portal-card">
+              <div className="portal-header flex items-center gap-2">
+                 <LayoutDashboard size={14} className="text-(--accent)" /> Board Stats
+              </div>
+              <div className="p-6 flex flex-col gap-4">
+                 <StatRow label="Total Threads" value={stats.threads.toLocaleString()} icon={<MessageSquare size={12} />} />
+                 <StatRow label="Total Posts" value={stats.posts.toLocaleString()} icon={<Send size={12} />} />
+                 <StatRow label="Global Members" value={stats.members.toLocaleString()} icon={<User size={12} />} />
+                 <div className="pt-4 border-t border-white/5">
+                    <span className="text-[10px] font-black uppercase text-gray-500 block mb-1">Newest Member</span>
+                    <span className="text-sm font-black italic text-(--accent)">{stats.newestUser || "N/A"}</span>
+                 </div>
+              </div>
+           </div>
+        </div>
+      </div>
+
       <div className="portal-card p-4 flex justify-between items-center bg-black/40">
         <div className="flex gap-8 text-[10px] font-bold uppercase tracking-widest">
           <div className="flex flex-col">
-            <span className="text-(--text-secondary)">Forum Mode</span>
-            <span>PUBLIC ACCESS</span>
-          </div>
-          <div className="flex flex-col">
-            <span className="text-(--text-secondary)">Sync Status</span>
-            <span className="text-emerald-500">LIVE</span>
+            <span className="text-(--text-secondary)">Forum Access</span>
+            <span>PUBLIC</span>
           </div>
         </div>
         <div className="text-[10px] text-right font-mono">
-          <span className="text-(--text-secondary)">Current Time:</span> <span className="text-(--accent)">{new Date().toLocaleTimeString()}</span>
+          <span className="text-(--text-secondary)">Local Time:</span> <span className="text-(--accent)">{new Date().toLocaleTimeString()}</span>
         </div>
       </div>
     </div>
@@ -201,40 +279,41 @@ function ForumCategory({ title, items }: any) {
           <h2 className="text-sm font-black uppercase tracking-[0.2em] text-white font-display neon-text">{title}</h2>
         </div>
         <div className="h-[1px] flex-1 bg-white/5 mx-6" />
-        <div className="text-[9px] font-mono text-gray-700 tracking-widest uppercase">CAT_ID_{title.slice(0, 3).toUpperCase()}</div>
       </div>
       <div className="portal-card rounded-t-none border-t-0 overflow-hidden mb-6">
-        <table className="vbulletin-table">
-          <thead>
-            <tr>
-              <th className="w-16"></th>
-              <th className="font-display tracking-[0.1em]">Protocol Node</th>
-              <th className="w-24 text-center hidden md:table-cell">Threads</th>
-              <th className="w-24 text-center hidden md:table-cell">Posts</th>
-              <th className="w-80 font-display tracking-[0.1em]">Operational Intel</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(item => (
-              <tr key={item.id} className="hover:bg-(--accent)/5 transition-colors border-b border-white/5 last:border-0 group">
-                <td className="text-center bg-black/5 group-hover:bg-(--accent)/10 transition-colors">
-                  <div className="relative inline-block">
-                    <MessageSquare size={18} className="mx-auto text-gray-700 group-hover:text-(--accent) transition-colors" />
-                    <div className="absolute inset-0 bg-(--accent) blur-md opacity-0 group-hover:opacity-20 transition-opacity" />
-                  </div>
-                </td>
-                <td className="py-5">
-                  <Link to={`/forum/${item.id}`} className="text-base font-black uppercase tracking-tight block hover:text-(--accent) transition-colors">{item.name}</Link>
-                </td>
-                <td className="text-center font-mono text-xs font-bold hidden md:table-cell text-gray-500 group-hover:text-white transition-colors">{item.threadCount || 0}</td>
-                <td className="text-center font-mono text-xs font-bold hidden md:table-cell text-gray-500 group-hover:text-white transition-colors">{item.postCount || 0}</td>
-                <td className="text-[10px] text-(--text-secondary) font-black uppercase tracking-widest py-5 opacity-40 group-hover:opacity-100 transition-opacity">
-                  {item.description}
-                </td>
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-(--accent)/20 scrollbar-track-transparent">
+          <table className="vbulletin-table min-w-[600px] md:min-w-full">
+            <thead>
+              <tr>
+                <th className="w-16"></th>
+                <th className="font-display tracking-[0.1em]">Section</th>
+                <th className="w-24 text-center hidden md:table-cell">Threads</th>
+                <th className="w-24 text-center hidden md:table-cell">Posts</th>
+                <th className="w-80 font-display tracking-[0.1em]">Description</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.map(item => (
+                <tr key={item.id} className="hover:bg-(--accent)/5 transition-colors border-b border-white/5 last:border-0 group">
+                  <td className="text-center bg-black/5 group-hover:bg-(--accent)/10 transition-colors">
+                    <div className="relative inline-block">
+                      <MessageSquare size={18} className="mx-auto text-gray-700 group-hover:text-(--accent) transition-colors" />
+                      <div className="absolute inset-0 bg-(--accent) blur-md opacity-0 group-hover:opacity-20 transition-opacity" />
+                    </div>
+                  </td>
+                  <td className="py-5">
+                    <Link to={`/forum/${item.id}`} className="text-base font-black uppercase tracking-tight block hover:text-(--accent) transition-colors">{item.name}</Link>
+                  </td>
+                  <td className="text-center font-mono text-xs font-bold hidden md:table-cell text-gray-500 group-hover:text-white transition-colors">{item.threadCount || 0}</td>
+                  <td className="text-center font-mono text-xs font-bold hidden md:table-cell text-gray-500 group-hover:text-white transition-colors">{item.postCount || 0}</td>
+                  <td className="text-[10px] text-(--text-secondary) font-black uppercase tracking-widest py-5 opacity-40 group-hover:opacity-100 transition-opacity">
+                    {item.description}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -244,6 +323,7 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
   const { forumId } = useParams();
   const [threads, setThreads] = useState<any[]>([]);
   const [forum, setForum] = useState<any>(null);
+  const [subForums, setSubForums] = useState<any[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
@@ -260,6 +340,12 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
     };
     getForum();
 
+    // Fetch sub-forums
+    const qSub = query(collection(db, "forums"), where("parentForumId", "==", forumId), orderBy("order", "asc"));
+    const unsubSub = onSnapshot(qSub, (snap) => {
+      setSubForums(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+
     const qThreads = query(
       collection(db, `forums/${forumId}/threads`),
       orderBy("sticky", "desc"),
@@ -269,7 +355,10 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
       setThreads(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
 
-    return () => unsub();
+    return () => {
+      unsub();
+      unsubSub();
+    };
   }, [forumId]);
 
   const filteredThreads = threads.filter(t => 
@@ -299,13 +388,13 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
   };
 
   const deleteThread = async (threadId: string) => {
-    if (!forumId || !isStaff || !window.confirm("CRITICAL: You are about to permanently delete this thread and all associated metadata. This action is irreversible. Continue?")) return;
+    if (!forumId || !isStaff || !window.confirm("Are you sure you want to delete this topic forever?")) return;
     try {
       await deleteDoc(doc(db, `forums/${forumId}/threads`, threadId));
       await updateDoc(doc(db, "forums", forumId), { threadCount: increment(-1) });
-      toast("success", "Thread Deleted", "The thread has been removed from the registry.");
+      toast("success", "Topic Deleted", "The topic was deleted.");
     } catch (e) {
-      toast("error", "Error", "Failed to purge thread data.");
+      toast("error", "Error", "Failed to delete topic.");
     }
   };
 
@@ -321,6 +410,7 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
       const threadRef = await addDoc(collection(db, `forums/${forumId}/threads`), {
         title: newTitle,
         content: newContent,
+        forumId: forumId,
         authorId: auth.currentUser.uid,
         authorName: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || "Unknown",
         createdAt: serverTimestamp(),
@@ -385,16 +475,22 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
       </div>
       {/* ... rest of the render logic remains similar but uses filteredThreads ... */}
 
+      {subForums.length > 0 && (
+        <div className="mb-6">
+          <ForumCategory title="Sub-Forums" items={subForums} />
+        </div>
+      )}
+
       {showCreate && (
         <motion.div 
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           className="portal-card"
         >
-          <div className="portal-header">Post New Thread</div>
+          <div className="portal-header">Start New Topic</div>
           <form onSubmit={handleCreateThread} className="p-6 flex flex-col gap-4">
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-black uppercase text-(--text-secondary)">Thread Title</label>
+              <label className="text-[10px] font-black uppercase text-(--text-secondary)">Topic Title</label>
               <input 
                 required
                 disabled={isMuted}
@@ -412,7 +508,7 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
                 value={newContent}
                 onChange={(e) => setNewContent(e.target.value)}
                 className="bg-black/20 border border-(--border-color) p-3 text-sm min-h-[150px] outline-none focus:border-(--accent) transition-colors disabled:opacity-50" 
-                placeholder={isMuted ? "You are currently muted and cannot create new threads." : "Post content details here..."} 
+                placeholder={isMuted ? "You are currently muted and cannot start new topics." : "Write your content here..."} 
               />
             </div>
             <div className="flex justify-end gap-2">
@@ -421,7 +517,7 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
                  disabled={isMuted}
                  className="bg-(--accent) text-black px-8 py-2 text-[10px] font-black uppercase tracking-widest disabled:opacity-50"
                >
-                 Create Thread
+                 Post Topic
                </button>
             </div>
           </form>
@@ -429,55 +525,76 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
       )}
 
       <div className="portal-card">
-        <table className="vbulletin-table">
-          <thead>
-            <tr>
-              <th className="w-12"></th>
-              <th>Topic</th>
-              <th className="w-32">Author</th>
-              <th className="w-24 text-center">Date</th>
-              <th className="w-32 text-right">Last Post</th>
-            </tr>
-          </thead>
-          <tbody>
-            {threads.length === 0 ? (
+        <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-(--accent)/20 scrollbar-track-transparent">
+          <table className="vbulletin-table min-w-[500px] md:min-w-full">
+            <thead>
               <tr>
-                <td colSpan={5} className="py-8 text-center text-xs text-gray-500 font-bold uppercase">No threads found in this section.</td>
+                <th className="w-12"></th>
+                <th>Topic</th>
+                <th className="w-24 text-center hidden md:table-cell">Author</th>
+                <th className="w-20 text-center hidden lg:table-cell">Views</th>
+                <th className="w-20 text-center hidden lg:table-cell">Replies</th>
+                <th className="w-24 text-center hidden sm:table-cell">Date</th>
+                <th className="w-32 text-right hidden md:table-cell">Last Post</th>
               </tr>
-            ) : filteredThreads.map((t) => (
-              <tr key={t.id} className="hover:bg-white/5 group">
-                <td className="text-center">
-                  {t.sticky ? <Pin size={12} className="text-(--accent) mx-auto" /> : <FileText size={12} className="text-gray-500 mx-auto" />}
-                </td>
-                <td className="py-3">
-                  <div className="flex items-center gap-2">
-                    {t.sticky && (
-                      <span className="bg-(--accent)/10 border border-(--accent)/30 text-(--accent) px-1.5 py-0.5 text-[8px] font-black uppercase tracking-tighter">
-                        Sticky
-                      </span>
-                    )}
-                    {t.locked && <Lock size={12} className="text-red-500" />}
-                    <Link to={`/forum/thread/${forumId}/${t.id}`} className="text-sm font-bold hover:text-(--accent)">{t.title}</Link>
-                  </div>
-                  {isStaff && (
-                    <div className="flex gap-2 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => togglePin(t.id, t.sticky)} className="text-[8px] font-black uppercase text-emerald-500 hover:underline">{t.sticky ? 'Unpin' : 'Pin'}</button>
-                      <button onClick={() => toggleLock(t.id, t.locked)} className="text-[8px] font-black uppercase text-blue-500 hover:underline">{t.locked ? 'Unlock' : 'Lock'}</button>
-                      <button onClick={() => deleteThread(t.id)} className="text-[8px] font-black uppercase text-red-500 hover:underline">Delete</button>
+            </thead>
+            <tbody>
+              {threads.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="py-8 text-center text-xs text-gray-500 font-bold uppercase">No threads found in this section.</td>
+                </tr>
+              ) : filteredThreads.map((t) => (
+                <tr key={t.id} className="hover:bg-white/5 group border-b border-white/5 last:border-0">
+                  <td className="text-center">
+                    {t.sticky ? <Pin size={12} className="text-(--accent) mx-auto" /> : <FileText size={12} className="text-gray-700 mx-auto group-hover:text-white transition-colors" />}
+                  </td>
+                  <td className="py-4">
+                    <div className="flex items-center gap-2">
+                       {t.sticky && (
+                        <span className="bg-(--accent)/10 border border-(--accent)/30 text-(--accent) px-1.5 py-0.5 text-[8px] font-black uppercase tracking-tighter shadow-[0_0_10px_rgba(242,125,38,0.1)]">
+                          Sticky
+                        </span>
+                      )}
+                      {t.locked && <Lock size={12} className="text-red-500" />}
+                      <Link to={`/forum/thread/${forumId}/${t.id}`} className="text-sm font-black uppercase italic tracking-tight hover:text-(--accent) transition-colors line-clamp-1">{t.title}</Link>
                     </div>
-                  )}
-                </td>
-                <td className="text-xs font-bold text-(--text-secondary)">{t.authorName}</td>
-                <td className="text-center font-mono text-[10px] text-gray-500">
-                  {t.createdAt?.toDate().toLocaleDateString() || "..."}
-                </td>
-                <td className="text-right text-[10px] text-(--text-secondary) font-bold uppercase">
-                  VIEW THREAD
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                    <div className="flex md:hidden items-center gap-2 text-[8px] text-gray-600 font-black uppercase mt-1">
+                      <span className="text-white/60">{t.authorName}</span>
+                      <span className="opacity-20">•</span>
+                      <span>{t.createdAt?.toDate().toLocaleDateString()}</span>
+                    </div>
+                    {isStaff && (
+                      <div className="flex gap-3 mt-1 opacity-10 group-hover:opacity-100 transition-opacity">
+                        <button onClick={() => togglePin(t.id, t.sticky)} className="text-[7px] font-black uppercase text-emerald-500/60 hover:text-emerald-400 transition-colors">{t.sticky ? 'Unpin' : 'Pin'}</button>
+                        <button onClick={() => toggleLock(t.id, t.locked)} className="text-[7px] font-black uppercase text-blue-500/60 hover:text-blue-400 transition-colors">{t.locked ? 'Unlock' : 'Lock'}</button>
+                        <button onClick={() => deleteThread(t.id)} className="text-[7px] font-black uppercase text-red-500/60 hover:text-red-400 transition-colors">Delete</button>
+                      </div>
+                    )}
+                  </td>
+                  <td className="text-[10px] font-black uppercase text-(--text-secondary) text-center hidden md:table-cell italic">{t.authorName}</td>
+                  <td className="text-center font-mono text-[10px] text-gray-700 hidden lg:table-cell group-hover:text-(--accent) transition-colors flex items-center md:table-cell">
+                    <div className="flex items-center justify-center gap-1">
+                      <Eye size={10} className="opacity-40" />
+                      {t.viewCount || 0}
+                    </div>
+                  </td>
+                  <td className="text-center font-mono text-[10px] text-gray-700 hidden lg:table-cell group-hover:text-white transition-colors flex items-center md:table-cell">
+                    <div className="flex items-center justify-center gap-1">
+                      <MessageSquare size={10} className="opacity-40" />
+                      {t.replyCount || 0}
+                    </div>
+                  </td>
+                  <td className="text-center font-mono text-[10px] text-gray-500 hidden sm:table-cell px-2">
+                    {t.createdAt?.toDate().toLocaleDateString() || "..."}
+                  </td>
+                  <td className="text-right text-[9px] text-(--text-secondary) font-black uppercase hidden md:table-cell pr-4 opacity-40 group-hover:opacity-100 transition-opacity">
+                    VIEW TOPIC
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
@@ -499,7 +616,17 @@ function ThreadView({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean }
     // Real-time thread metadata listener
     const unsubThread = onSnapshot(doc(db, `forums/${forumId}/threads`, threadId), (snap) => {
       if (snap.exists()) {
-        setThread({ id: snap.id, ...snap.data() });
+        const data = snap.data();
+        setThread({ id: snap.id, ...data });
+        
+        // Track view
+        const viewedThreads = JSON.parse(localStorage.getItem('viewed_threads') || '{}');
+        const now = Date.now();
+        if (!viewedThreads[threadId] || now - viewedThreads[threadId] > 3600000) {
+           updateDoc(snap.ref, { viewCount: increment(1) }).catch(console.error);
+           viewedThreads[threadId] = now;
+           localStorage.setItem('viewed_threads', JSON.stringify(viewedThreads));
+        }
       }
     });
 
@@ -656,10 +783,11 @@ function ThreadView({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean }
             index={idx + 1}
             id={p.id}
             author={p.authorName} 
+            authorId={p.authorId}
             rank={idx === 0 ? "Thread Starter" : "Member"} 
             avatar={p.authorName[0]} 
             content={p.content} 
-            date={p.createdAt?.toDate().toLocaleString() || "..."}
+            date={p.createdAt ? p.createdAt.toDate().toLocaleString() : "..."}
             isStaff={isStaff}
             onDelete={deletePost}
             onReport={() => setReportingPost(p)}
@@ -730,30 +858,108 @@ function ThreadView({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean }
   );
 }
 
-function Post({ index, id, author, rank, avatar, content, date, isStaff, onDelete, onReport }: any) {
+function StatRow({ label, value, icon }: any) {
+  return (
+    <div className="flex justify-between items-center group">
+       <div className="flex items-center gap-2 text-[10px] font-black uppercase text-gray-500 group-hover:text-white transition-colors">
+          {icon} {label}
+       </div>
+       <span className="text-xs font-mono font-bold text-white bg-white/5 border border-white/5 px-2 py-0.5 group-hover:border-(--accent) transition-all">{value}</span>
+    </div>
+  );
+}
+
+function RecentActivityList() {
+  const [activities, setActivities] = useState<any[]>([]);
+
+  useEffect(() => {
+    const q = query(collectionGroup(db, "threads"), orderBy("createdAt", "desc"), limit(5));
+    const unsub = onSnapshot(q, (snap) => {
+      setActivities(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })));
+    });
+    return () => unsub();
+  }, []);
+
+  return (
+    <div className="divide-y divide-white/5">
+       {activities.length === 0 ? (
+         <div className="p-8 text-center text-[10px] font-bold uppercase text-gray-500 italic">No recent activity detected on the network.</div>
+       ) : activities.map(act => (
+         <Link 
+           key={act.id} 
+           to={`/forum/thread/${act.forumId}/${act.id}`}
+           className="flex items-center justify-between p-4 px-6 hover:bg-(--accent)/5 transition-all group"
+         >
+            <div className="flex flex-col">
+               <span className="text-sm font-black uppercase italic group-hover:text-(--accent) transition-colors">{act.title}</span>
+               <div className="flex items-center gap-2 text-[9px] font-black uppercase text-gray-600 mt-1">
+                  <span>By {act.authorName}</span>
+                  <span className="opacity-20">•</span>
+                  <span>In {act.forumId ? <ForumName forumId={act.forumId} /> : "Unknown"}</span>
+               </div>
+            </div>
+            <div className="text-right flex flex-col">
+               <span className="text-[10px] font-mono font-bold text-gray-500">{act.createdAt?.toDate().toLocaleDateString()}</span>
+               <span className="text-[9px] font-black uppercase text-emerald-500/40">{act.replyCount || 0} REPLIES</span>
+            </div>
+         </Link>
+       ))}
+    </div>
+  );
+}
+
+function ForumName({ forumId }: { forumId: string }) {
+  const [name, setName] = useState("...");
+  useEffect(() => {
+    getDoc(doc(db, "forums", forumId)).then(s => {
+      if (s.exists()) setName(s.data().name);
+    });
+  }, [forumId]);
+  return <span>{name}</span>;
+}
+
+function Post({ index, id, author, authorId, rank, avatar, content, date, isStaff, onDelete, onReport }: any) {
+  const [authorData, setAuthorData] = useState<any>(null);
+
+  useEffect(() => {
+    if (authorId) {
+      getDoc(doc(db, "users", authorId)).then(snap => {
+        if (snap.exists()) setAuthorData(snap.data());
+      });
+    }
+  }, [authorId]);
+
   return (
     <div className="flex portal-card min-h-[220px] flex-col md:flex-row group border-white/5 overflow-hidden" id={`post-${id}`}>
       <aside className="w-full md:w-56 bg-black/40 backdrop-blur-md border-b md:border-b-0 md:border-r border-white/5 p-6 flex flex-col items-center gap-4 group-hover:bg-black/60 transition-colors">
         <div className="relative">
-          <div className="w-24 h-24 bg-(--accent)/5 border border-(--accent)/20 flex items-center justify-center text-5xl font-black text-(--accent) rotate-3 group-hover:rotate-0 transition-transform shadow-[0_0_20px_rgba(56,189,248,0.1)]">
-            {avatar}
+          <div className="w-24 h-24 bg-(--accent)/5 border border-(--accent)/20 flex items-center justify-center text-5xl font-black text-(--accent) rotate-3 group-hover:rotate-0 transition-transform shadow-[0_0_20px_rgba(56,189,248,0.1)] overflow-hidden">
+            {authorData?.skin ? (
+              <img 
+                src={`https://pawnokit.com/skins/${authorData.skin}.png`} 
+                alt={author} 
+                className="w-full h-full object-contain -mt-4 drop-shadow-[0_0_5px_var(--accent)]"
+                referrerPolicy="no-referrer"
+              />
+            ) : avatar}
           </div>
           <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 border-4 border-black rounded-full" title="Online" />
         </div>
-        <div className="flex flex-col items-center gap-1">
-          <span className="font-black uppercase tracking-tight text-white group-hover:text-(--accent) transition-colors text-lg italic">{author}</span>
+        <div className="flex flex-col items-center gap-1 text-center">
+          <span className="font-black uppercase tracking-tight text-white group-hover:text-(--accent) transition-colors text-lg italic truncate max-w-[180px]">{author}</span>
           <span className={clsx(
             "text-[9px] font-black uppercase tracking-[0.3em] px-3 py-1 border leading-none shadow-sm",
             rank === 'Thread Starter' ? "bg-(--accent)/10 border-(--accent) text-(--accent) neon-shadow" : "bg-white/5 border-white/10 text-gray-500"
-          )}>{rank}</span>
+          )}>{authorData?.role || rank}</span>
         </div>
-        <div className="mt-2 w-full flex flex-col gap-1.5">
-          <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-gray-700">
-             <span>Identity</span>
-             <span className="text-gray-500">VERIFIED</span>
+        <div className="mt-2 w-full flex flex-col gap-1.5 border-t border-white/5 pt-3">
+          <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-gray-600">
+             <span>Player Level</span>
+             <span className="text-white italic">{authorData?.level || 0}</span>
           </div>
-          <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-             <div className="h-full bg-(--accent) w-3/4 opacity-40 shadow-[0_0_10px_var(--glow)]" />
+          <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-gray-600">
+             <span>Bank Account</span>
+             <span className="text-emerald-500">${(authorData?.money || 0).toLocaleString()}</span>
           </div>
         </div>
       </aside>
@@ -761,29 +967,31 @@ function Post({ index, id, author, rank, avatar, content, date, isStaff, onDelet
         <div className="flex justify-between items-center mb-6 text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 border-b border-white/5 pb-3">
           <div className="flex items-center gap-3">
              <span className="bg-white/5 px-2 py-0.5 text-gray-400">#{index}</span>
-             <span className="opacity-40 tracking-widest whitespace-nowrap">TRANSMISSION RECEIVED: {date}</span>
+             <span className="opacity-40 tracking-widest whitespace-nowrap">Posted on: {date}</span>
           </div>
           <div className="flex gap-4 opacity-40 group-hover:opacity-100 transition-opacity">
             {isStaff && onDelete && id && (
               <button onClick={() => onDelete(id)} className="text-red-500 hover:text-red-400 flex items-center gap-1 transition-colors">
-                <Trash2 size={12} /> PURGE
+                <Trash2 size={12} /> Delete
               </button>
             )}
             <button className="hover:text-white transition-all flex items-center gap-1">
-               <Send size={11} className="rotate-45" /> QUOTE
+               <Send size={11} className="rotate-45" /> Quote
             </button>
             <button onClick={onReport} className="hover:text-red-500 transition-all flex items-center gap-1">
-               <AlertCircle size={11} /> FLAG
+               <AlertCircle size={11} /> Report
             </button>
           </div>
         </div>
-        <div className="text-base leading-relaxed whitespace-pre-line text-gray-300 font-medium italic opacity-90 mb-8">
-          "{content}"
+        <div className="text-sm md:text-base leading-relaxed text-gray-300 font-medium opacity-90 mb-8 min-h-[100px] markdown-body">
+          <Markdown>{content}</Markdown>
         </div>
-        <div className="mt-auto pt-4 border-t border-white/5 flex items-center gap-2 text-[8px] font-mono tracking-widest text-gray-800">
-           <div className="w-2 h-2 bg-gray-900 rounded-full animate-pulse" />
-           CRC_CHECK: HEX_7F2A_B3P
-        </div>
+        {authorData?.signature && (
+          <div className="mt-auto pt-6 border-t border-white/5 opacity-40 hover:opacity-100 transition-opacity">
+            <div className="text-[9px] font-black uppercase tracking-widest text-gray-600 mb-2 italic">User Signature</div>
+            <div className="text-[10px] text-gray-400 italic italic font-display">{authorData.signature}</div>
+          </div>
+        )}
       </div>
     </div>
   );

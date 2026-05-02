@@ -5,72 +5,79 @@ import { collection, query, orderBy, limit, onSnapshot } from "firebase/firestor
 import { db } from "../lib/firebase";
 import { motion, AnimatePresence } from "motion/react";
 
+import { 
+  BarChart, 
+  Bar, 
+  XAxis, 
+  YAxis, 
+  CartesianGrid, 
+  Tooltip, 
+  ResponsiveContainer, 
+  Cell
+} from "recharts";
+
 type Category = "players" | "money" | "combat" | "jobs" | "crime" | "social" | "misc";
 
 export default function Highscores() {
   const [activeTab, setActiveTab] = useState<Category>("players");
-  const [activeJob, setActiveJob] = useState<string>("Trucker");
   const [activeSubCombat, setActiveSubCombat] = useState<string>("Core");
-  const [activeMiscTab, setActiveMiscTab] = useState<string>("Skins");
   
   const [scoreData, setScoreData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Real-time listener for current players/wealth from Firestore
   useEffect(() => {
-    if (activeTab === "players" || activeTab === "money") {
-      setLoading(true);
-      const field = activeTab === "players" ? "level" : "money";
-      const q = query(
-        collection(db, "users"),
-        orderBy(field, "desc"),
-        limit(10)
-      );
+    setLoading(true);
+    let field = "level";
+    let collectionName = "users";
 
-      const unsubscribe = onSnapshot(q, (snapshot) => {
-        const data = snapshot.docs.map((doc, index) => {
-          const userData = doc.data();
-          if (activeTab === "players") {
-            return {
-              rank: `#${index + 1}`,
-              name: userData.username,
-              level: userData.level,
-              hours: userData.playingHours || 0
-            };
-          } else {
-            return {
-              rank: `#${index + 1}`,
-              name: userData.username,
-              bank: new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(userData.money || 0),
-              mats: userData.materials || 0
-            };
-          }
-        });
-        setScoreData(data);
-        setLoading(false);
-        setLastUpdated(new Date());
-      });
+    if (activeTab === "money") field = "money";
+    if (activeTab === "combat") field = "kills";
 
-      return () => unsubscribe();
-    } else {
-      // Fetch from Server API for other categories
-      const fetchHighscores = async () => {
-        setLoading(true);
-        try {
-          const res = await fetch(`/api/highscores/${activeTab}`);
-          const data = await res.json();
-          setScoreData(data);
-          setLastUpdated(new Date());
-        } catch (e) {
-          console.error("Failed to fetch highscores", e);
-        } finally {
-          setLoading(false);
+    const q = query(
+      collection(db, collectionName),
+      orderBy(field, "desc"),
+      limit(15)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = snapshot.docs.map((doc, index) => {
+        const userData = doc.data();
+        if (activeTab === "players") {
+          return {
+            rank: `#${index + 1}`,
+            name: userData.username || "Unknown",
+            level: userData.level || 0,
+            hours: userData.playingHours || 0
+          };
+        } else if (activeTab === "money") {
+          return {
+            rank: `#${index + 1}`,
+            name: userData.username || "Unknown",
+            bank: new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(userData.money || 0),
+            mats: userData.materials || 0
+          };
+        } else if (activeTab === "combat") {
+          return {
+            rank: `#${index + 1}`,
+            name: userData.username || "Unknown",
+            kills: userData.kills || 0,
+            deaths: userData.deaths || 0,
+            kd: ((userData.kills || 0) / (Math.max(1, userData.deaths || 0))).toFixed(2)
+          };
         }
-      };
-      
-      fetchHighscores();
-    }
+        return null;
+      }).filter(Boolean);
+
+      setScoreData(data);
+      setLoading(false);
+      setLastUpdated(new Date());
+    }, (error) => {
+      console.error("Firestore error:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [activeTab]);
 
   const renderContent = () => {
@@ -78,96 +85,24 @@ export default function Highscores() {
       return (
         <div className="flex flex-col items-center justify-center p-20 gap-4">
           <Loader2 className="animate-spin text-(--accent)" size={32} />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] animate-pulse">Accessing Mainframe...</span>
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] animate-pulse">Loading Rankings...</span>
         </div>
       );
     }
 
     switch (activeTab) {
       case "players":
-        return <ScoreTable headers={["Rank", "Player", "Level", "Playing Hours"]} data={scoreData} />;
+        return <ScoreTable headers={["Rank", "Player", "Level", "Hours"]} data={scoreData} />;
       case "money":
-        return <ScoreTable headers={["Rank", "Player", "Bank Balance", "Materials"]} data={scoreData} />;
+        return <ScoreTable headers={["Rank", "Player", "Bank", "Items"]} data={scoreData} />;
       case "combat":
-        return (
-          <div className="flex flex-col">
-            <div className="bg-black/20 p-2 flex gap-2 border-b border-(--border)">
-              {["Core", "Events", "Hunger Games"].map(t => (
-                <button 
-                  key={t}
-                  onClick={() => setActiveSubCombat(t)}
-                  className={clsx(
-                    "px-3 py-1 text-[9px] font-bold uppercase tracking-widest border transition-colors",
-                    activeSubCombat === t ? "bg-(--accent)/20 border-(--accent) text-(--accent)" : "bg-white/5 border-white/10 text-(--text-secondary)"
-                  )}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-            <ScoreTable 
-              headers={activeSubCombat === "Core" ? ["Rank", "Player", "Kills", "Deaths", "K/D"] : 
-                       activeSubCombat === "Events" ? ["Rank", "Player", "Event Wins", "Recent Participation"] : 
-                       ["Rank", "Player", "HG Wins", "Matches Played"]}
-              data={scoreData} 
-            />
-          </div>
-        );
-      case "jobs":
-        return (
-          <div className="flex flex-col">
-            <div className="bg-black/20 p-2 flex flex-wrap gap-2 border-b border-(--border)">
-              {[
-                "Trucker", "Lawyer", "Drug Dealer", "Mechanic", "Arms Dealer", 
-                "Detective", "Drug Smuggler", "Fishing", "Boxing", "Carjacker"
-              ].map(job => (
-                <button 
-                  key={job}
-                  onClick={() => setActiveJob(job)}
-                  className={clsx(
-                    "px-3 py-1 text-[9px] font-bold uppercase tracking-widest border transition-colors",
-                    activeJob === job ? "bg-(--accent)/20 border-(--accent) text-(--accent)" : "bg-white/5 border-white/10 text-(--text-secondary) hover:text-white"
-                  )}
-                >
-                  {job}
-                </button>
-              ))}
-            </div>
-            <ScoreTable 
-              headers={["Rank", "Player", "Job", "Experience", "Total Tasks"]} 
-              data={getJobData(activeJob)} 
-            />
-          </div>
-        );
-      case "crime":
-        return <ScoreTable headers={["Rank", "Player", "Crimes Committed", "Total Arrests", "Primary Crime Type"]} data={mockCrime} />;
-      case "social":
-        return <ScoreTable headers={["Rank", "Faction/Gang", "Leader", "Members", "Net Worth"]} data={mockSocial} />;
-      case "misc":
-        return (
-          <div className="flex flex-col">
-            <div className="bg-black/20 p-2 flex gap-2 border-b border-(--border)">
-              {["Skins", "Popular Cars"].map(t => (
-                <button 
-                  key={t}
-                  onClick={() => setActiveMiscTab(t)}
-                  className={clsx(
-                    "px-3 py-1 text-[9px] font-bold uppercase tracking-widest border transition-colors",
-                    activeMiscTab === t ? "bg-(--accent)/20 border-(--accent) text-(--accent)" : "bg-white/5 border-white/10 text-(--text-secondary)"
-                  )}
-                >
-                  {t}
-                </button>
-              ))}
-            </div>
-            <ScoreTable 
-              headers={activeMiscTab === "Skins" ? ["Rank", "Skin ID", "Name", "Popularity (%)"] : ["Rank", "Model", "Class", "Total Owned"]}
-              data={activeMiscTab === "Skins" ? mockSkins : mockCars} 
-            />
-          </div>
-        );
+        return <ScoreTable headers={["Rank", "Player", "Kills", "Deaths", "K/D"]} data={scoreData} />;
       default:
-        return null;
+        return (
+          <div className="p-20 text-center opacity-30 italic uppercase font-black tracking-widest text-[10px]">
+            Data coming soon...
+          </div>
+        );
     }
   };
 
@@ -207,32 +142,24 @@ export default function Highscores() {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-3 mb-4">
-        <TabButton active={activeTab === "players"} onClick={() => setActiveTab("players")} icon={<Users size={16} />} label="Elite Operators" />
-        <TabButton active={activeTab === "money"} onClick={() => setActiveTab("money")} icon={<DollarSign size={16} />} label="Wealth Index" />
-        <TabButton active={activeTab === "combat"} onClick={() => setActiveTab("combat")} icon={<Skull size={16} />} label="Combat Log" />
-        <TabButton active={activeTab === "jobs"} onClick={() => setActiveTab("jobs")} icon={<Briefcase size={16} />} label="Vocation Ranks" />
-        <TabButton active={activeTab === "crime"} onClick={() => setActiveTab("crime")} icon={<Shield size={16} />} label="Wanted List" />
-        <TabButton active={activeTab === "social"} onClick={() => setActiveTab("social")} icon={<Clock size={16} />} label="Faction Stats" />
-        <TabButton active={activeTab === "misc"} onClick={() => setActiveTab("misc")} icon={<Zap size={16} />} label="Archived Ops" />
+      <div className="flex flex-nowrap md:flex-wrap gap-3 mb-4 overflow-x-auto pb-2 scrollbar-none -mx-4 px-4 md:mx-0 md:px-0">
+        <TabButton active={activeTab === "players"} onClick={() => setActiveTab("players")} icon={<Users size={16} />} label="Levels" />
+        <TabButton active={activeTab === "money"} onClick={() => setActiveTab("money")} icon={<DollarSign size={16} />} label="Wealth" />
+        <TabButton active={activeTab === "combat"} onClick={() => setActiveTab("combat")} icon={<Skull size={16} />} label="Combat" />
       </div>
 
       <div className="portal-card">
         <div className="portal-header">
           <span className="flex items-center gap-2">
-            Ranking Snapshot: {activeTab.toUpperCase()}
-            {activeTab === "players" || activeTab === "money" ? (
-              <span className="text-[8px] bg-(--accent)/20 text-(--accent) px-2 py-0.5 border border-(--accent)/30 font-black animate-pulse">LIVE UPDATES ACTIVE</span>
-            ) : (
-              <span className="text-[8px] bg-blue-500/20 text-blue-400 px-2 py-0.5 border border-blue-500/30 font-black">FETCHED FROM MASTER SERVER</span>
-            )}
+            Top Players: {activeTab.toUpperCase()}
+            <span className="text-[8px] bg-(--accent)/20 text-(--accent) px-2 py-0.5 border border-(--accent)/30 font-black animate-pulse uppercase">Live Data</span>
           </span>
-          <span className="text-[10px] opacity-50">Master DB Sync Active</span>
+          <span className="text-[10px] opacity-50 uppercase">Synched</span>
         </div>
         <div className="overflow-x-auto min-h-[400px]">
           <AnimatePresence mode="wait">
             <motion.div
-              key={activeTab + (activeJob && activeTab === "jobs" ? activeJob : "")}
+              key={activeTab}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -278,9 +205,9 @@ function ScoreTable({ headers, data }: { headers: string[]; data: any[] }) {
   const remaining = data.slice(3);
 
   return (
-    <div className="flex flex-col gap-6 p-4">
+    <div className="flex flex-col gap-6 p-2 md:p-4">
       {/* Top 3 Podium Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-2">
         {top3.map((player, idx) => {
           const values = Object.values(player);
           return (
@@ -347,95 +274,3 @@ function ScoreTable({ headers, data }: { headers: string[]; data: any[] }) {
   );
 }
 
-const getJobData = (job: string) => {
-  const players = [
-    { rank: "#1", name: "Snake", job: job, exp: "142,500", total: "1,205" },
-    { rank: "#2", name: "Officer_Bob", job: job, exp: "98,200", total: "852" },
-    { rank: "#3", name: "Rider", job: job, exp: "45,102", total: "421" },
-    { rank: "#4", name: "CJ_V2", job: job, exp: "12,400", total: "150" },
-    { rank: "#5", name: "Sweet_P", job: job, exp: "5,200", total: "42" },
-  ];
-  
-  const mappings: Record<string, any> = {
-    "Trucker": { name: "Trucker_Joe", exp: "2,450,000", total: "12,402" },
-    "Lawyer": { name: "Saul_Goodman", exp: "850,000", total: "1,402" },
-    "Drug Dealer": { name: "Heisenberg", exp: "5,000,000", total: "8,421" },
-    "Mechanic": { name: "Mac_Mechanic", exp: "1,210,400", total: "4,210" },
-    "Arms Dealer": { name: "War_Lord", exp: "980,500", total: "2,105" },
-    "Detective": { name: "Sherlock", exp: "450,000", total: "982" },
-    "Drug Smuggler": { name: "Narco_P", exp: "3,200,000", total: "5,602" },
-    "Fishing": { name: "Old_Man_Sea", exp: "120,400", total: "42,102" },
-    "Boxing": { name: "Tyson_X", exp: "560,000", total: "450" },
-    "Carjacker": { name: "GoneIn60", exp: "890,200", total: "1,205" },
-  };
-
-  if (mappings[job]) {
-    players[0] = { rank: "#1", ...mappings[job], job };
-  }
-  
-  return players;
-};
-
-// Mock Data
-const mockPlayers = [
-  { rank: "#1", name: "Snake", level: 94, hours: "4,210" },
-  { rank: "#2", name: "Officer_Bob", level: 82, hours: "3,850" },
-  { rank: "#3", name: "Rider", level: 75, hours: "2,100" },
-  { rank: "#4", name: "CJ_V2", level: 68, hours: "1,980" },
-  { rank: "#5", name: "Sweet_P", level: 55, hours: "1,200" },
-  { rank: "#6", name: "Ghost_Rider", level: 52, hours: "1,150" },
-  { rank: "#7", name: "Lamar_D", level: 48, hours: "980" },
-];
-
-const mockMoney = [
-  { rank: "#1", name: "Snake", bank: "$42,450,000", mats: "1.2M" },
-  { rank: "#2", name: "GoldDigger", bank: "$31,000,000", mats: "400K" },
-  { rank: "#3", name: "Merchant_X", bank: "$18,500,000", mats: "2.1M" },
-  { rank: "#4", name: "Oil_Tycoon", bank: "$12,400,000", mats: "500K" },
-];
-
-const mockCombat = [
-  { rank: "#1", name: "Assassin", kills: 14502, deaths: 421, kd: "34.4" },
-  { rank: "#2", name: "Hitman_V", kills: 8210, deaths: 1205, kd: "6.8" },
-  { rank: "#3", name: "Rambo_99", kills: 5201, deaths: 1102, kd: "4.7" },
-];
-
-const mockEvents = [
-  { rank: "#1", name: "Speedy_Gonzales", wins: 142, recent: "Race Winner" },
-  { rank: "#2", name: "Deadshot", wins: 98, recent: "Last Man Standing" },
-  { rank: "#3", name: "Tank_User", wins: 45, recent: "City War" },
-];
-
-const mockHungerGames = [
-  { rank: "#1", name: "Katniss_RP", wins: 84, matches: 210 },
-  { rank: "#2", name: "Survive_All", wins: 52, matches: 402 },
-  { rank: "#3", name: "Bush_Camper", wins: 41, matches: 850 },
-];
-
-const mockCrime = [
-  { rank: "#1", name: "El_Chapo_RP", crimes: 8421, arrests: 45, type: "Organized Crime" },
-  { rank: "#2", name: "Heist_King", crimes: 5210, arrests: 120, type: "Bank Robbery" },
-  { rank: "#3", name: "JoyRider", crimes: 4102, arrests: 210, type: "Grand Theft Auto" },
-  { rank: "#4", name: "Smuggler_D", crimes: 2401, arrests: 15, type: "Narcotic Trafficking" },
-];
-
-const mockSocial = [
-  { rank: "#1", faction: "Los Santos PD", leader: "Chief_Wiggum", members: 42, wealth: "$850M" },
-  { rank: "#2", faction: "Grove Street Families", leader: "Sweet", members: 28, wealth: "$120M" },
-  { rank: "#3", faction: "Ballas", leader: "Kane", members: 35, wealth: "$95M" },
-  { rank: "#4", faction: "Vagos", leader: "Big_Poppa", members: 15, wealth: "$45M" },
-];
-
-const mockSkins = [
-  { rank: "#1", id: 294, name: "The Boss", pop: "14.2%" },
-  { rank: "#2", id: 299, name: "Claude (GTA3)", pop: "11.1%" },
-  { rank: "#3", id: 21, name: "Street Gang", pop: "9.5%" },
-  { rank: "#4", id: 46, name: "Mechanic", pop: "8.2%" },
-];
-
-const mockCars = [
-  { rank: "#1", model: "Infernus", class: "Super", total: 421 },
-  { rank: "#2", model: "NRG-500", class: "Bike", total: 385 },
-  { rank: "#3", model: "Sultan", class: "Sports", total: 310 },
-  { rank: "#4", model: "Turismo", class: "Super", total: 240 },
-];

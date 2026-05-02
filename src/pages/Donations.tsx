@@ -16,8 +16,8 @@ export default function Donations() {
           <div className="flex items-center gap-4">
              <div className="w-1.5 h-10 bg-(--accent) shadow-[0_0_15px_var(--glow)]" />
              <div>
-               <h1 className="text-3xl font-black uppercase tracking-tighter italic font-display">RESOURCE UPLINK</h1>
-               <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em] -mt-1 opacity-60">Identity Tier Calibration & Network Support</p>
+               <h1 className="text-3xl font-black uppercase tracking-tighter italic font-display">Supporter Perks</h1>
+               <p className="text-[10px] text-gray-500 font-black uppercase tracking-[0.3em] -mt-1 opacity-60">Help the community & unlock extra features</p>
              </div>
           </div>
         </div>
@@ -38,14 +38,14 @@ export default function Donations() {
         <div className="lg:col-span-2 flex flex-col gap-8">
           {/* Goal Tracker */}
           <div className="portal-card relative overflow-hidden group p-8 bg-black/40 backdrop-blur-md">
-            <div className="absolute top-0 right-0 p-4 opacity-5 italic text-[11px] font-black tracking-widest font-mono">NODE_CAPACITY_V2</div>
+            <div className="absolute top-0 right-0 p-4 opacity-5 italic text-[11px] font-black tracking-widest font-mono">MAINTENANCE_GOAL</div>
             <div className="flex flex-col gap-6 relative z-10">
               <div className="flex justify-between items-end">
                 <div className="flex flex-col gap-2">
                   <h3 className="text-lg font-black uppercase tracking-widest text-white flex items-center gap-3 font-display neon-text">
-                    <Heart className="text-red-500 animate-pulse" size={18} /> Monthly Maintenance Link
+                    <Heart className="text-red-500 animate-pulse" size={18} /> Monthly Goal
                   </h3>
-                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest opacity-60">Infrastructure overhead: Hosting, anti-ddos, dev licenses</p>
+                  <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest opacity-60">Covers hosting, protection, and development</p>
                 </div>
                 <div className="text-right flex flex-col">
                   <span className="text-2xl font-black text-white font-display leading-none">$259.00</span>
@@ -77,10 +77,10 @@ export default function Donations() {
               <div className="flex justify-between text-[9px] font-black uppercase tracking-[0.3em] text-gray-600">
                 <span className="flex items-center gap-2">
                   <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                  Link Integrity: HIGH
+                  Status: Healthy
                 </span>
                 <span className={clsx("transition-colors", goalProgress > 50 ? "text-emerald-500" : "text-orange-500")}>
-                  {goalProgress}% Synchronized
+                  {goalProgress}% Finished
                 </span>
               </div>
             </div>
@@ -148,27 +148,10 @@ export default function Donations() {
           <div className="portal-card h-fit">
             <div className="portal-header flex items-center gap-2">
               <Globe size={14} className="text-blue-500" />
-              Top Network Benefactors
+              Top Supporters
             </div>
-            <div className="p-6 flex flex-col gap-1">
-              {[
-                { name: "ZeroCool", amount: 150, color: "text-pink-500" },
-                { name: "AcidBurn", amount: 125, color: "text-cyan-500" },
-                { name: "CerealKiller", amount: 85, color: "text-yellow-500" },
-                { name: "LordNikon", amount: 50, color: "text-white" },
-                { name: "ThePlague", amount: 30, color: "text-white" }
-              ].map((b, i) => (
-                <div key={b.name} className={clsx(
-                  "flex items-center justify-between p-3 border-b border-white/5 last:border-0 hover:bg-white/5 transition-colors group",
-                  i === 0 && "bg-white/5"
-                )}>
-                  <div className="flex items-center gap-3">
-                    <span className="text-[10px] font-mono text-gray-600">#{i + 1}</span>
-                    <span className={clsx("text-xs font-black uppercase italic group-hover:tracking-wider transition-all", b.color)}>{b.name}</span>
-                  </div>
-                  <span className="text-xs font-mono font-bold text-gray-400">${b.amount.toFixed(2)}</span>
-                </div>
-              ))}
+            <div className="p-6 flex flex-col gap-1 text-center py-12">
+              <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest italic">No contributors detected yet.</p>
             </div>
           </div>
 
@@ -178,21 +161,21 @@ export default function Donations() {
                    <div className="p-2 bg-blue-500/20 rounded">
                       <Zap size={18} className="text-blue-500" />
                    </div>
-                   <h4 className="text-xs font-black uppercase text-blue-400 leading-tight">Instant Network Sync</h4>
+                   <h4 className="text-xs font-black uppercase text-blue-400 leading-tight">Instant Updates</h4>
                 </div>
                 <p className="text-[10px] text-blue-200/60 font-medium leading-relaxed">
-                   All contributions are processed through our primary node. Rank elevation is strictly automated and usually completes within 60 seconds of confirmation.
+                   All perks are processed instantly. Your rank will update in game almost immediately after purchase.
                 </p>
              </div>
           </div>
 
           <div className="portal-card overflow-hidden">
-            <div className="portal-header">Manual Receipt Uplink</div>
+            <div className="portal-header">Manual Sync</div>
             <div className="p-6 flex flex-col gap-4">
-              <p className="text-[10px] text-gray-500 font-bold uppercase leading-relaxed">If you have contributed via external gateways and need to manually synchronize your identity:</p>
+              <p className="text-[10px] text-gray-500 font-bold uppercase leading-relaxed">If you paid through another method and need to update your rank manually:</p>
               <div className="flex flex-col gap-2">
-                <input className="bg-black/60 border border-white/10 p-3 text-[10px] font-mono outline-none focus:border-(--accent) text-white" placeholder="HASH_OR_TX_ID..." />
-                <button className="bg-white/5 hover:bg-white/10 border border-white/10 py-3 font-black uppercase text-[10px] tracking-widest transition-all">Synchronize Log</button>
+                <input className="bg-black/60 border border-white/10 p-3 text-[10px] font-mono outline-none focus:border-(--accent) text-white" placeholder="Transaction ID..." />
+                <button className="bg-white/5 hover:bg-white/10 border border-white/10 py-3 font-black uppercase text-[10px] tracking-widest transition-all">Submit ID</button>
               </div>
             </div>
           </div>
@@ -203,7 +186,7 @@ export default function Donations() {
       <div className="flex flex-col gap-6 max-w-4xl">
         <div className="flex items-center gap-3 mb-2">
            <Info size={18} className="text-gray-500" />
-           <h2 className="text-sm font-black uppercase tracking-[0.2em] text-gray-400">Deployment Intelligence (FAQ)</h2>
+           <h2 className="text-sm font-black uppercase tracking-[0.2em] text-gray-400">Common Questions</h2>
         </div>
         <div className="grid md:grid-cols-2 gap-4">
            {[
@@ -270,7 +253,7 @@ function CheckoutModal({ tier, onClose }: any) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 sm:p-12">
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6 md:p-12">
       <motion.div 
         initial={{ opacity: 0 }} 
         animate={{ opacity: 1 }} 
@@ -283,7 +266,7 @@ function CheckoutModal({ tier, onClose }: any) {
         initial={{ scale: 0.9, opacity: 0, y: 20 }}
         animate={{ scale: 1, opacity: 1, y: 0 }}
         exit={{ scale: 0.9, opacity: 0, y: 20 }}
-        className="w-full max-w-lg bg-(--card-bg) border border-(--border-color) relative z-10 shadow-2xl overflow-hidden"
+        className="w-full max-w-lg bg-(--card-bg) border border-(--border-color) relative z-10 shadow-2xl overflow-y-auto max-h-[90vh] custom-scrollbar"
       >
         <div className="bg-(--accent) text-black p-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -517,7 +500,7 @@ function DonationTier({ title, price, icon, features, featured, onSelect }: any)
             featured ? "bg-(--accent) text-black hover:bg-white neon-shadow" : "bg-white/5 border border-white/10 hover:bg-white/10 text-white"
           )}
         >
-          Authorize Uplink
+          Get Access
         </button>
       </div>
     </div>

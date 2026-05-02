@@ -758,7 +758,7 @@ function UserManagement() {
         });
         toast("success", `${type} Applied`, `The target user has been issued a ${type.toLowerCase()}.`);
         loadUserHistory(viewingHistory); // Refresh
-        setBanForm({ reason: "", duration: "Permanent" });
+        setBanForm({ reason: "", duration: "Permanent", ip: "" });
         setActiveHistoryTab('history');
       }
     } catch (e) {
@@ -2389,7 +2389,7 @@ function ServerCommands() {
             placeholder="Type command (e.g. sv_restart, say)..."
           />
           <button 
-            onClick={executeCommand}
+            onClick={() => executeCommand()}
             className="bg-red-500 text-white px-8 py-3 text-[10px] font-black uppercase tracking-widest hover:bg-red-600 transition-all select-none"
           >
             Execute
@@ -3619,7 +3619,7 @@ function EventManagement() {
                   <input 
                     type="number"
                     value={newEvent.playerCount}
-                    onChange={e => setNewEvent({...newEvent, playerCount: e.target.value})}
+                    onChange={e => setNewEvent({...newEvent, playerCount: parseInt(e.target.value) || 0})}
                     className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-pink-500"
                   />
                 </div>

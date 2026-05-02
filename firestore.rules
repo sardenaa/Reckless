@@ -191,21 +191,22 @@ service cloud.firestore {
     match /forums/{forumId} {
       allow read: if true;
       allow write: if isForumStaff();
+    }
+
+    // Threads (Supports collection group query)
+    match /{path=**}/threads/{threadId} {
+      allow read: if true;
+      allow create: if isNotBanned() && isValidThread(incoming()) && 
+                    exists(/databases/$(database)/documents/forums/$(path[path.size()-1]));
       
-      // Threads
-      match /threads/{threadId} {
-        allow read: if true;
-        allow create: if isNotBanned() && isValidThread(incoming()) && 
-                      exists(/databases/$(database)/documents/forums/$(forumId));
-        
-        allow update: if (
-          isAdmin() || isForumStaff() ||
-          (isNotBanned() && isOwner(existing().authorId) && !existing().locked && 
-           incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'updatedAt', 'sticky', 'locked']))
-        );
-        
-        allow delete: if isAdmin() || isForumStaff();
-      }
+      allow update: if (
+        isAdmin() || isForumStaff() ||
+        (isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['viewCount'])) ||
+        (isNotBanned() && isOwner(existing().authorId) && !existing().locked && 
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'updatedAt', 'sticky', 'locked']))
+      );
+      
+      allow delete: if isAdmin() || isForumStaff();
     }
 
     // Thread Posts (Replies)

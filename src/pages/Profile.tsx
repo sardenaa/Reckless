@@ -92,13 +92,13 @@ export default function Profile() {
 
   return (
     <div className="flex flex-col gap-8">
-      <div className="flex items-center justify-between mb-4 pb-4 border-b border-white/5">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 pb-4 border-b border-white/5 gap-4">
         <div className="flex items-center gap-4">
             <div className="w-4 h-16 bg-(--accent) transform -rotate-12" />
-            <div className="flex flex-col">
-              <h1 className="text-5xl font-display italic font-normal uppercase tracking-tight text-white leading-none">CHARACTER DOSSIER</h1>
-              <span className="text-sm font-marker text-(--accent) -rotate-1 ml-2">Internal identity token: {uid?.slice(0, 12).toUpperCase()}</span>
-            </div>
+              <div className="flex flex-col">
+                <h1 className="text-3xl sm:text-5xl font-display italic font-normal uppercase tracking-tight text-white leading-none">CHARACTER DOSSIER</h1>
+                <span className="text-[10px] sm:text-sm font-marker text-(--accent) -rotate-1 ml-1 sm:ml-2">Internal identity token: {uid?.slice(0, 12).toUpperCase()}</span>
+              </div>
         </div>
         {isOwner && (
           <div className="flex gap-3">
@@ -229,9 +229,11 @@ export default function Profile() {
         </aside>
 
         <div className="flex-1 flex flex-col gap-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-8 gap-4">
             <QuickStat label="Cash" value={`$${stats.money.toLocaleString()}`} color="text-emerald-400" />
             <QuickStat label="Bank" value={`$${stats.bank.toLocaleString()}`} color="text-emerald-500" />
+            <QuickStat label="Level" value={stats.level} color="text-cyan-400" />
+            <QuickStat label="Hours" value={stats.hours} color="text-purple-400" />
             <QuickStat label="Kills" value={stats.kills} color="text-red-500" />
             <QuickStat label="Deaths" value={stats.deaths} color="text-gray-500" />
             <QuickStat label="Arrests" value={stats.arrests} color="text-blue-500" />

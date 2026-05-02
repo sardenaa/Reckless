@@ -20,7 +20,6 @@ import ForgotPassword from "./pages/ForgotPassword";
 import Events from "./pages/Events";
 import EventDetails from "./pages/EventDetails";
 import { ToastProvider } from "./components/Toast";
-import RadioChatter from "./components/RadioChatter";
 import CustomCursor from "./components/CustomCursor";
 
 const socket = io();
@@ -209,7 +208,6 @@ export default function App() {
     <ToastProvider>
       <Router>
         <CustomCursor />
-        <RadioChatter />
         <div className="min-h-screen flex flex-col bg-(--bg-color) text-(--text-primary) font-sans overflow-x-hidden relative selection:bg-(--accent) selection:text-black">
           {/* Scanline Effect Overlay */}
           <div className="scanline" />
@@ -306,18 +304,18 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <header className="bg-black border-b-2 border-(--accent) px-6 py-6 flex items-center justify-between z-50 sticky top-0 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
-          <Link to="/" className="flex items-center gap-4 group">
+        <header className="bg-black border-b-2 border-(--accent) px-4 md:px-6 py-4 md:py-6 flex items-center justify-between z-50 sticky top-0 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
+          <Link to="/" className="flex items-center gap-3 md:gap-4 group">
             <div className="relative">
-              <div className="w-12 h-12 bg-white flex items-center justify-center transform -rotate-12 group-hover:rotate-0 transition-transform duration-500 shadow-xl">
-                 <Terminal className="text-black w-8 h-8" />
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-white flex items-center justify-center transform -rotate-12 group-hover:rotate-0 transition-transform duration-500 shadow-xl">
+                 <Terminal className="text-black w-6 h-6 md:w-8 md:h-8" />
               </div>
             </div>
             <div className="flex flex-col">
-              <span className="font-display text-4xl font-normal tracking-tight uppercase italic leading-none text-white">
+              <span className="font-display text-2xl md:text-4xl font-normal tracking-tight uppercase italic leading-none text-white whitespace-nowrap">
                 ReckLess <span className="text-(--accent)">RolePlay</span>
               </span>
-              <span className="text-[10px] font-mono tracking-[0.5em] text-(--accent) opacity-60 uppercase font-bold">Operation_Portal_v2.0</span>
+              <span className="text-[8px] md:text-[10px] font-mono tracking-[0.3em] md:tracking-[0.5em] text-(--accent) opacity-60 uppercase font-bold">Operation_Portal_v2.0</span>
             </div>
           </Link>
 
@@ -383,16 +381,16 @@ export default function App() {
         {/* Info Ticker */}
         <div className="bg-black text-white p-2 px-6 overflow-hidden hidden sm:block relative border-b border-white/5">
           <div className="flex gap-12 whitespace-nowrap animate-marquee font-display text-xs items-center uppercase italic font-medium">
-             <span className="text-(--accent) flex items-center gap-2"><div className="w-2 h-2 bg-(--accent) animate-pulse rounded-full" /> Status: Global Surveillance Active</span>
-             <span>// Current Objective: Maintain Authority</span>
-             <span>// Uplink: ReckLessRP.Net:7777</span>
-             <span>// Warning: Excessive Force Authorized</span>
-             <span className="text-(--accent) flex items-center gap-2"><div className="w-2 h-2 bg-(--accent) animate-pulse rounded-full" /> Status: Global Surveillance Active</span>
+             <span className="text-(--accent) flex items-center gap-2"><div className="w-2 h-2 bg-(--accent) animate-pulse rounded-full" /> Status: Server Online</span>
+             <span>// Current News: New updates recently added</span>
+             <span>// Connect: ReckLessRP.Net:7777</span>
+             <span>// Message: Welcome to our community</span>
+             <span className="text-(--accent) flex items-center gap-2"><div className="w-2 h-2 bg-(--accent) animate-pulse rounded-full" /> Status: Server Online</span>
           </div>
         </div>
 
         {/* Main Content Area */}
-        <main className="flex-1 flex max-w-7xl mx-auto w-full p-6 gap-6 relative">
+        <main className="flex-1 flex max-w-7xl mx-auto w-full p-4 md:p-6 gap-6 relative">
           <div className="flex-1 min-w-0">
             <Routes>
               <Route path="/" element={<Home />} />
@@ -445,7 +443,7 @@ export default function App() {
 
             <SidebarWidget title="Social Links">
               <div className="grid grid-cols-2 gap-2 text-[10px] font-bold uppercase">
-                <a href="#" className="flex items-center justify-center p-2 bg-[#5865F2]/10 border border-[#5865F2]/20 hover:bg-[#5865F2]/20 transition-colors">Discord</a>
+                <a href="https://discord.gg/gypVSQZjd5" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center p-2 bg-[#5865F2]/10 border border-[#5865F2]/20 hover:bg-[#5865F2]/20 transition-colors">Discord</a>
                 <a href="#" className="flex items-center justify-center p-2 bg-[#1DA1F2]/10 border border-[#1DA1F2]/20 hover:bg-[#1DA1F2]/20 transition-colors">Twitter</a>
                 <a href="#" className="flex items-center justify-center p-2 bg-[#FF0000]/10 border border-[#FF0000]/20 hover:bg-[#FF0000]/20 transition-colors">YouTube</a>
                 <a href="#" className="flex items-center justify-center p-2 bg-[#E1306C]/10 border border-[#E1306C]/20 hover:bg-[#E1306C]/20 transition-colors">Instagram</a>
