@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Routes, Route, Link, NavLink } from "react-router-dom";
-import { LayoutDashboard, Users, Megaphone, Activity, ShieldCheck, ChevronRight, Search, Trash2, Edit2, MessageSquare, Plus, Save, X, Gavel, History, BarChart3, AlertCircle, VolumeX, Terminal as TerminalIcon, Globe, ListFilter, ClipboardList, Settings2, Calendar, FileCheck, Eye, Filter } from "lucide-react";
+import { LayoutDashboard, Users, Megaphone, Activity, ShieldCheck, ChevronRight, Search, Trash2, Edit2, MessageSquare, Plus, Save, X, Gavel, History, BarChart3, AlertCircle, VolumeX, Terminal as TerminalIcon, Globe, ListFilter, ClipboardList, Settings2, Calendar, FileCheck, Eye, Filter, ShieldAlert } from "lucide-react";
 import { 
   collection, 
   query, 
@@ -22,6 +22,7 @@ import { clsx } from "clsx";
 import { motion, AnimatePresence } from "motion/react";
 import { AlertTriangle, Pin, PinOff } from "lucide-react";
 import { useToast } from "../components/Toast";
+import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 
 export default function AdminPanel() {
   const [userPerms, setUserPerms] = useState<any>({});
@@ -51,6 +52,23 @@ export default function AdminPanel() {
   const canManageEvents = isAdmin || userPerms.canManageEvents;
 
   if (loading) return <div className="flex justify-center p-12"><div className="w-8 h-8 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div></div>;
+
+  const isStaffAtAll = isAdmin || isSuperAdmin || canManageUsers || canEditForums || canManageAnnouncements || canManageServer || canManageEvents;
+
+  if (!isStaffAtAll) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center p-12 text-center gap-6">
+        <ShieldAlert size={64} className="text-red-500 animate-pulse" />
+        <div className="flex flex-col gap-2">
+          <h2 className="text-4xl font-black uppercase tracking-tighter italic text-white">Access Denied</h2>
+          <p className="text-xs font-mono text-gray-500 uppercase tracking-[0.3em]">Security clearance insufficient for this sector.</p>
+        </div>
+        <Link to="/" className="mt-4 px-8 py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest transition-all">
+          Return to Surface
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -160,10 +178,14 @@ function AdminDashboard() {
   useEffect(() => {
     const unsubUsers = onSnapshot(collection(db, "users"), (snap) => {
       setStats(prev => ({ ...prev, users: snap.size }));
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, "users (dashboard count)");
     });
     
     const unsubReports = onSnapshot(query(collection(db, "reports"), where("status", "==", "Open")), (snap) => {
       setStats(prev => ({ ...prev, reports: snap.size }));
+    }, (err) => {
+      handleFirestoreError(err, OperationType.LIST, "reports (dashboard count)");
     });
 
     const unsubServer = onSnapshot(doc(db, "server_status", "main"), (snap) => {
@@ -171,6 +193,8 @@ function AdminDashboard() {
         setServerStatus(snap.data());
         setStats(prev => ({ ...prev, online: snap.data().playerCount || 0 }));
       }
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, "server_status/main");
     });
 
     return () => { unsubUsers(); unsubReports(); unsubServer(); };
@@ -286,15 +310,15 @@ function AdminDashboard() {
         <div className="portal-card">
           <div className="portal-header flex items-center justify-between">
             <div className="flex items-center gap-2 font-black italic">
-              <Calendar size={14} className="text-pink-500" /> Community Operations
+              <Calendar size={14} className="text-(--accent)" /> Community Operations
             </div>
-            <Link to="/admin/events" className="text-[9px] font-black uppercase text-pink-500 hover:underline">Manage All</Link>
+            <Link to="/admin/events" className="text-[9px] font-black uppercase text-(--accent) hover:underline">Manage All</Link>
           </div>
           <div className="p-6 flex flex-col gap-4">
             <div className="flex flex-col gap-3">
               <button 
                 onClick={() => window.location.hash = "#/admin/events"} 
-                className="w-full bg-pink-500/10 border border-pink-500/30 text-pink-500 py-3 text-[10px] font-black uppercase tracking-widest hover:bg-pink-500 hover:text-white transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(236,72,153,0.1)]"
+                className="w-full bg-(--accent)/10 border border-(--accent)/30 text-(--accent) py-3 text-[10px] font-black uppercase tracking-widest hover:bg-(--accent) hover:text-white transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(242,125,38,0.1)]"
               >
                 <Plus size={14} /> Initialize New Event Directive
               </button>
@@ -404,7 +428,7 @@ function RecentDashboardEvents() {
       {recent.map(ev => (
         <div key={ev.id} className="p-3 bg-black/30 border border-white/5 flex flex-col gap-1">
           <div className="flex justify-between items-center">
-             <span className="text-[10px] font-black uppercase italic text-pink-500">{ev.title}</span>
+             <span className="text-[10px] font-black uppercase italic text-(--accent)">{ev.title}</span>
              <span className={clsx(
                "text-[7px] px-1 font-black border",
                ev.status === 'active' ? "border-emerald-500 text-emerald-500" : "border-gray-500 text-gray-500"
@@ -3259,18 +3283,18 @@ function EventManagement() {
     <div className="flex flex-col gap-6">
       <div className="flex justify-between items-center">
         <h2 className="text-xl font-black uppercase tracking-tighter italic flex items-center gap-2">
-          <Calendar className="text-pink-500" size={20} /> Operation Deployment
+          <Calendar className="text-(--accent)" size={20} /> Operation Deployment
         </h2>
         <div className="flex gap-2">
           <button 
             onClick={() => setShowCatModal(true)}
-            className="border border-pink-500/30 text-pink-500 px-4 py-2 text-[10px] font-black uppercase tracking-widest hover:bg-pink-500/5 transition-colors flex items-center gap-2"
+            className="border border-(--accent)/30 text-(--accent) px-4 py-2 text-[10px] font-black uppercase tracking-widest hover:bg-(--accent)/5 transition-colors flex items-center gap-2"
           >
             <Settings2 size={14} /> Classifications
           </button>
           <button 
             onClick={() => setShowCreate(true)}
-            className="bg-pink-500 text-white px-6 py-2 text-[10px] font-black uppercase tracking-widest hover:bg-pink-600 transition-colors flex items-center gap-2"
+            className="bg-(--accent) text-black px-6 py-2 text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-colors flex items-center gap-2"
           >
             <Plus size={14} /> New Deployment
           </button>
@@ -3288,7 +3312,7 @@ function EventManagement() {
                   onClick={() => setStatusFilter(s)}
                   className={clsx(
                     "px-3 py-1.5 text-[9px] font-black uppercase tracking-widest border transition-all",
-                    statusFilter === s ? "bg-pink-500/20 border-pink-500 text-pink-500 shadow-[0_0_10px_rgba(236,72,153,0.1)]" : "border-white/5 text-gray-500 hover:text-white"
+                    statusFilter === s ? "bg-(--accent)/20 border-(--accent) text-(--accent) shadow-[0_0_10px_rgba(242,125,38,0.1)]" : "border-white/5 text-gray-500 hover:text-white"
                   )}
                 >
                   {s}
@@ -3489,7 +3513,7 @@ function EventManagement() {
       {showCatModal && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[200]">
           <div className="portal-card w-full max-w-md">
-            <div className="portal-header flex justify-between items-center text-pink-500">
+            <div className="portal-header flex justify-between items-center text-(--accent)">
               <span className="flex items-center gap-2"><Settings2 size={16} /> Event Categories</span>
               <button onClick={() => setShowCatModal(false)}><X size={16} /></button>
             </div>
@@ -3498,10 +3522,10 @@ function EventManagement() {
                 <input 
                   value={newCatName}
                   onChange={e => setNewCatName(e.target.value)}
-                  className="flex-1 bg-black/40 border border-white/10 p-2 text-sm outline-none focus:border-pink-500"
+                  className="flex-1 bg-black/40 border border-white/10 p-2 text-sm outline-none focus:border-(--accent)"
                   placeholder="Category Name"
                 />
-                <button onClick={addCategory} className="bg-pink-500 text-white px-4 py-2 text-xs font-black uppercase"><Plus size={14} /></button>
+                <button onClick={addCategory} className="bg-(--accent) text-black px-4 py-2 text-xs font-black uppercase"><Plus size={14} /></button>
               </div>
               <div className="flex flex-col gap-1 max-h-[300px] overflow-y-auto">
                 {categories.map(c => (
@@ -3544,8 +3568,8 @@ function EventManagement() {
       {showCreate && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-[200]">
           <div className="portal-card w-full max-w-lg">
-            <div className="portal-header flex justify-between items-center text-pink-500">
-              <span className="flex items-center gap-2"><Calendar size={16} /> New Event Directive</span>
+            <div className="portal-header flex justify-between items-center text-(--accent)">
+              <span className="flex items-center gap-2 font-display italic font-normal"><Calendar size={16} /> New Event Directive</span>
               <button onClick={() => setShowCreate(false)}><X size={16} /></button>
             </div>
             <form onSubmit={handleCreateEvent} className="p-8 flex flex-col gap-6">
@@ -3556,7 +3580,7 @@ function EventManagement() {
                     required
                     value={newEvent.title}
                     onChange={e => setNewEvent({...newEvent, title: e.target.value})}
-                    className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-pink-500"
+                    className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-(--accent)"
                     placeholder="e.g. LS Street Race"
                   />
                 </div>
@@ -3565,7 +3589,7 @@ function EventManagement() {
                   <select 
                     value={newEvent.type}
                     onChange={e => setNewEvent({...newEvent, type: e.target.value})}
-                    className="bg-black border border-white/10 p-3 text-sm outline-none focus:border-pink-500"
+                    className="bg-black border border-white/10 p-3 text-sm outline-none focus:border-(--accent)"
                   >
                     {combinedTypes.map(t => <option key={t} value={t}>{t}</option>)}
                   </select>
@@ -3577,7 +3601,7 @@ function EventManagement() {
                 <textarea 
                   value={newEvent.description}
                   onChange={e => setNewEvent({...newEvent, description: e.target.value})}
-                  className="bg-black/40 border border-white/10 p-3 text-sm min-h-[80px] outline-none focus:border-pink-500"
+                  className="bg-black/40 border border-white/10 p-3 text-sm min-h-[80px] outline-none focus:border-(--accent)"
                   placeholder="What happens during this event?"
                 />
               </div>
@@ -3590,7 +3614,7 @@ function EventManagement() {
                     type="datetime-local"
                     value={newEvent.startTime}
                     onChange={e => setNewEvent({...newEvent, startTime: e.target.value})}
-                    className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-pink-500"
+                    className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-(--accent)"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -3598,7 +3622,7 @@ function EventManagement() {
                   <input 
                     value={newEvent.prize}
                     onChange={e => setNewEvent({...newEvent, prize: e.target.value})}
-                    className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-emerald-500"
+                    className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-(--accent)"
                     placeholder="e.g. $50,000 + Donator Points"
                   />
                 </div>
@@ -3610,7 +3634,7 @@ function EventManagement() {
                   <input 
                     value={newEvent.location}
                     onChange={e => setNewEvent({...newEvent, location: e.target.value})}
-                    className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-pink-500"
+                    className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-(--accent)"
                     placeholder="e.g. Santa Maria Beach"
                   />
                 </div>
@@ -3620,7 +3644,7 @@ function EventManagement() {
                     type="number"
                     value={newEvent.playerCount}
                     onChange={e => setNewEvent({...newEvent, playerCount: parseInt(e.target.value) || 0})}
-                    className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-pink-500"
+                    className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-(--accent)"
                   />
                 </div>
               </div>
@@ -3630,7 +3654,7 @@ function EventManagement() {
                 <input 
                   value={newEvent.creatorOverride}
                   onChange={e => setNewEvent({...newEvent, creatorOverride: e.target.value})}
-                  className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-pink-500"
+                  className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-(--accent)"
                   placeholder="Auto-detected if empty"
                 />
               </div>
@@ -3640,7 +3664,7 @@ function EventManagement() {
                 <select 
                   value={newEvent.status}
                   onChange={e => setNewEvent({...newEvent, status: e.target.value})}
-                  className="bg-black border border-white/10 p-3 text-sm outline-none focus:border-pink-500"
+                  className="bg-black border border-white/10 p-3 text-sm outline-none focus:border-(--accent)"
                 >
                   <option value="scheduled">Scheduled</option>
                   <option value="active">Active</option>
@@ -3652,8 +3676,8 @@ function EventManagement() {
               <div className="flex justify-end gap-2 pt-4 border-t border-white/5">
                 <button type="button" onClick={() => setShowCreate(false)} className="px-6 py-2 text-[10px] font-bold uppercase transition-colors hover:bg-white/5">Cancel</button>
                 <button 
-                  type="submit"
-                  className="bg-pink-500 text-white px-8 py-3 text-[10px] font-black uppercase tracking-widest hover:bg-pink-600 transition-all flex items-center gap-2"
+                   type="submit"
+                   className="bg-(--accent) text-black px-8 py-3 text-[10px] font-black uppercase tracking-widest hover:opacity-90 transition-all flex items-center gap-2"
                 >
                   <Save size={14} /> Commit Event
                 </button>

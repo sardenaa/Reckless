@@ -32,7 +32,10 @@ service cloud.firestore {
       return data.username is string && data.username.size() >= 3 && data.username.size() <= 24 &&
              data.role in ['User', 'Moderator', 'Admin', 'Super Admin', 'Forum Moderator', 'Server Manager'] &&
              data.uid is string &&
-             (data.get('permissions', null) == null || data.permissions is map);
+             (data.get('permissions', null) == null || data.permissions is map) &&
+             (data.get('skin', null) == null || data.skin is int) &&
+             (data.get('signature', null) == null || data.signature is string) &&
+             (data.get('tags', null) == null || data.tags is list);
     }
 
     function getUserData() {
@@ -105,17 +108,22 @@ service cloud.firestore {
 
     // --- Collections ---
 
+    // Connectivity Test
+    match /test/connection {
+      allow read: if true;
+    }
+
     // Users
     match /users/{userId} {
       allow get: if isSignedIn();
-      allow list: if isStaff() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow list: if isSignedIn();
       
       allow create: if isNotBanned() && isOwner(userId) && isValidUser(incoming()) && 
                     (incoming().role == 'User' || incoming().role == 'user');
       
       allow update: if (
         isUserStaff() ||
-        (isNotBanned() && isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['username', 'skin']))
+        (isNotBanned() && isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['username', 'skin', 'signature', 'lastActive']))
       ) && isValidUser(incoming());
     }
 
@@ -152,10 +160,43 @@ service cloud.firestore {
       allow delete: if isStaff();
     }
 
-    // Admins (Seed collection)
-    match /admins/{adminId} {
+    // Mutes
+    match /mutes/{muteId} {
       allow read: if isSignedIn();
-      allow write: if false; // Only manageable via console
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Warnings
+    match /warnings/{warnId} {
+      allow read: if isStaff() || (isSignedIn() && resource.data.targetUid == request.auth.uid);
+      allow create: if isStaff();
+      allow update: if isStaff();
+      allow delete: if isStaff();
+    }
+
+    // Vehicles
+    match /vehicles/{vehicleId} {
+      allow read: if true;
+      allow write: if isServerStaff();
+    }
+
+    // Properties
+    match /properties/{propId} {
+      allow read: if true;
+      allow write: if isServerStaff();
+    }
+
+    // IP Bans
+    match /ip_bans/{banId} {
+      allow read: if isStaff();
+      allow write: if isServerStaff();
+    }
+
+    match /settings/forum_stats {
+      allow read: if true;
+      allow write: if isSignedIn(); // Incrementing post counts usually happens on thread creation
     }
 
     // Announcements
@@ -200,17 +241,18 @@ service cloud.firestore {
                     exists(/databases/$(database)/documents/forums/$(path[path.size()-1]));
       
       allow update: if (
-        isAdmin() || isForumStaff() ||
+        isForumStaff() ||
         (isSignedIn() && incoming().diff(existing()).affectedKeys().hasOnly(['viewCount'])) ||
         (isNotBanned() && isOwner(existing().authorId) && !existing().locked && 
-          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'updatedAt', 'sticky', 'locked']))
+          incoming().diff(existing()).affectedKeys().hasOnly(['title', 'content', 'updatedAt']) &&
+          incoming().sticky == existing().sticky && incoming().locked == existing().locked)
       );
       
       allow delete: if isAdmin() || isForumStaff();
     }
 
     // Thread Posts (Replies)
-    match /threads/{threadId}/posts/{postId} {
+    match /{path=**}/posts/{postId} {
       allow read: if true;
       allow create: if isNotBanned();
       

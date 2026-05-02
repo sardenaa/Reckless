@@ -25,6 +25,8 @@ L.Icon.Default.mergeOptions({
   shadowUrl: markerShadow,
 });
 
+import { BRANDING } from "../constants";
+
 const socket = io();
 
 export default function ServerInfo() {
@@ -34,7 +36,6 @@ export default function ServerInfo() {
   const [maintenance, setMaintenance] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
-  const serverIp = "51.83.49.125:10735";
   const { toast } = useToast();
 
   useEffect(() => {
@@ -76,7 +77,7 @@ export default function ServerInfo() {
   }, []);
 
   const copyIp = () => {
-    navigator.clipboard.writeText(status?.ip || serverIp);
+    navigator.clipboard.writeText(status?.ip || `${BRANDING.IP}:${BRANDING.PORT}`);
     toast("info", "IP Copied", "Server IP copied to clipboard!");
   };
 
@@ -126,7 +127,7 @@ export default function ServerInfo() {
                     "w-3 h-3 rounded-full shadow-[0_0_10px_currentColor]",
                     maintenance ? "text-yellow-500 bg-yellow-500" : (status?.online ? "text-emerald-400 bg-emerald-400 animate-pulse" : "text-red-500 bg-red-500")
                   )} />
-                  <h2 className="text-xl md:text-2xl font-black font-mono tracking-wider text-white break-all">{status?.ip || serverIp}</h2>
+                  <h2 className="text-xl md:text-2xl font-black font-mono tracking-wider text-white break-all">{status?.ip || `${BRANDING.IP}:${BRANDING.PORT}`}</h2>
                   <button 
                     onClick={copyIp}
                     className="p-1.5 bg-white/10 border border-white/20 text-white hover:bg-(--accent) hover:border-(--accent) transition-all rounded-sm group/copy"
@@ -179,7 +180,7 @@ export default function ServerInfo() {
                 color={maintenance ? "text-yellow-500" : (status?.online ? "text-emerald-400" : "text-red-500")} 
               />
               <Metric icon={<Users size={16} />} label="Players" value={`${status?.players ?? 0} / ${status?.maxPlayers ?? 500}`} />
-              <Metric icon={<Shield size={16} />} label="Mode" value={status?.mode || "RR-RP v2.0"} />
+              <Metric icon={<Shield size={16} />} label="Mode" value={status?.mode || `${BRANDING.NAME} v2.0`} />
               <Metric icon={<MapIcon size={16} />} label="Map" value={status?.map || "San Andreas"} />
               <Metric icon={<Zap size={16} />} label="Ping" value="~32ms" />
               <Metric icon={<Terminal size={16} />} label="Version" value="0.3.7-R2" />
@@ -348,9 +349,14 @@ export default function ServerInfo() {
           <div className="flex-1 p-8 bg-black/20 text-center flex flex-col gap-4">
             <div className="text-3xl font-black text-[#5865F2]">1,204 MEMBERS</div>
             <p className="text-xs text-(--text-secondary) font-bold uppercase tracking-widest">Active & Growing Community</p>
-            <button className="bg-[#5865F2] text-white py-3 font-black uppercase text-xs tracking-widest hover:opacity-90 transition-opacity">
+            <a 
+              href={BRANDING.DISCORD_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="bg-[#5865F2] text-white py-3 font-black uppercase text-xs tracking-widest hover:opacity-90 transition-opacity flex items-center justify-center"
+            >
               Join Discord Server
-            </button>
+            </a>
           </div>
           <div className="w-full md:w-64 bg-black/40 p-4">
             <h4 className="text-[10px] font-black uppercase mb-3 opacity-50">Online Helpers</h4>

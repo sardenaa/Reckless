@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth, db } from "../lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, updateDoc, increment } from "firebase/firestore";
 import { UserPlus, Mail, Lock, User as UserIcon, AlertCircle, ArrowRight } from "lucide-react";
 import { useToast } from "../components/Toast";
 
@@ -39,8 +39,15 @@ export default function Register() {
         skin: 294, // Default skin
         level: 1,
         createdAt: new Date().toISOString(),
-        role: "User"
+        role: "User",
+        lastActive: new Date()
       });
+
+      // Update forum statistics
+      await updateDoc(doc(db, "settings", "forum_stats"), {
+        members: increment(1),
+        newestUser: username
+      }).catch(() => {});
 
       toast("success", "Welcome!", "Your account has been created successfully. Welcome to the community!");
       navigate("/");
@@ -102,7 +109,7 @@ export default function Register() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="flex flex-col gap-1">
                 <label className="text-[10px] font-black uppercase text-(--text-secondary) flex items-center gap-2">
                   <Lock size={12} /> Password

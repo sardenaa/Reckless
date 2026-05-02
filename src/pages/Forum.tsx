@@ -1,5 +1,5 @@
 import { Routes, Route, Link, useParams, useNavigate } from "react-router-dom";
-import { MessageSquare, Pin, Lock, User, Clock, ChevronRight, Send, AlertCircle, FileText, Search, Unlock, Trash2, ShieldAlert, X, VolumeX, Eye, Users, LayoutDashboard } from "lucide-react";
+import { MessageSquare, Pin, Lock, User, Clock, ChevronRight, Send, AlertCircle, FileText, Search, Unlock, Trash2, ShieldAlert, X, VolumeX, Eye, Users, LayoutDashboard, Edit3 } from "lucide-react";
 import { motion } from "motion/react";
 import React, { useState, useEffect, useMemo } from "react";
 import Markdown from "react-markdown";
@@ -23,6 +23,8 @@ import {
 } from "firebase/firestore";
 import { clsx } from "clsx";
 import { useToast } from "../components/Toast";
+import { BRANDING } from "../constants";
+import { handleFirestoreError, OperationType } from "../lib/firestore-errors";
 
 export default function Forum() {
   const [userRole, setUserRole] = useState("User");
@@ -39,6 +41,8 @@ export default function Forum() {
         setUserRole(data.role || "User");
         setUserPerms(data.permissions || {});
       }
+    }, (err) => {
+      handleFirestoreError(err, OperationType.GET, `users/${auth.currentUser?.uid}`);
     });
 
     const qMutes = query(
@@ -82,7 +86,7 @@ export default function Forum() {
         <div className="w-1.5 h-10 bg-(--accent) shadow-[0_0_15px_var(--glow)]" />
         <div className="flex flex-col">
           <h1 className="text-3xl font-black uppercase tracking-tighter italic font-display">Community Forum</h1>
-          <span className="text-[9px] font-mono tracking-[0.4em] opacity-40 uppercase -mt-1">ReckLess RolePlay Gaming Forum</span>
+          <span className="text-[9px] font-mono tracking-[0.4em] opacity-40 uppercase -mt-1">{BRANDING.NAME} Gaming Forum</span>
         </div>
       </div>
 
@@ -115,6 +119,10 @@ function ForumIndex() {
   const [stats, setStats] = useState({ threads: 0, posts: 0, members: 0, newestUser: "" });
   const [onlineUsers, setOnlineUsers] = useState<any[]>([]);
 
+  const onlineStaff = useMemo(() => onlineUsers.filter(u => 
+    ['Admin', 'Super Admin', 'Moderator', 'Forum Moderator', 'Server Manager'].includes(u.role)
+  ), [onlineUsers]);
+
   useEffect(() => {
     const qCat = query(collection(db, "categories"), orderBy("order", "asc"));
     const unsubCat = onSnapshot(qCat, (snap) => {
@@ -139,6 +147,8 @@ function ForumIndex() {
     const qOnline = query(collection(db, "users"), where("lastActive", ">", fifteenMinsAgo), limit(50));
     const unsubOnline = onSnapshot(qOnline, (snap) => {
        setOnlineUsers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+       handleFirestoreError(err, OperationType.LIST, "users (online query)");
     });
 
     return () => {
@@ -204,6 +214,33 @@ function ForumIndex() {
               </div>
               <div className="p-0">
                  <RecentActivityList />
+              </div>
+           </div>
+
+           <div className="portal-card">
+              <div className="portal-header flex items-center gap-2">
+                 <ShieldAlert size={14} className="text-red-500" /> Staff Currently Online
+              </div>
+              <div className="p-6">
+                 <div className="flex flex-wrap gap-x-3 gap-y-2">
+                    {onlineStaff.length === 0 ? (
+                      <span className="text-[10px] font-bold uppercase text-gray-700 italic">No staff members active in last 15 minutes.</span>
+                    ) : onlineStaff.map((u, i) => (
+                      <div key={u.id} className="flex items-center gap-2 bg-white/5 border border-white/5 px-2 py-1 group hover:border-(--accent)/30 transition-all">
+                        <div className={clsx(
+                          "w-1.5 h-1.5 rounded-full shadow-[0_0_8px_currentColor]",
+                          ['Admin', 'Super Admin'].includes(u.role) ? "bg-red-500 text-red-500" : "bg-blue-500 text-blue-500"
+                        )} />
+                        <Link to={`/profile/${u.id}`} className={clsx(
+                           "text-[10px] font-black uppercase hover:underline transition-colors",
+                           ['Admin', 'Super Admin'].includes(u.role) ? "text-red-500" : "text-blue-500"
+                        )}>
+                           {u.username}
+                        </Link>
+                        <span className="text-[7px] font-mono text-white/20 uppercase tracking-tighter group-hover:text-(--accent)/40 transition-colors">[{u.role}]</span>
+                      </div>
+                    ))}
+                 </div>
               </div>
            </div>
 
@@ -289,7 +326,8 @@ function ForumCategory({ title, items }: any) {
                 <th className="font-display tracking-[0.1em]">Section</th>
                 <th className="w-24 text-center hidden md:table-cell">Threads</th>
                 <th className="w-24 text-center hidden md:table-cell">Posts</th>
-                <th className="w-80 font-display tracking-[0.1em]">Description</th>
+                <th className="w-48 hidden lg:table-cell">Last Post</th>
+                <th className="w-64 font-display tracking-[0.1em]">Description</th>
               </tr>
             </thead>
             <tbody>
@@ -306,6 +344,20 @@ function ForumCategory({ title, items }: any) {
                   </td>
                   <td className="text-center font-mono text-xs font-bold hidden md:table-cell text-gray-500 group-hover:text-white transition-colors">{item.threadCount || 0}</td>
                   <td className="text-center font-mono text-xs font-bold hidden md:table-cell text-gray-500 group-hover:text-white transition-colors">{item.postCount || 0}</td>
+                  <td className="hidden lg:table-cell py-5">
+                    {item.lastPostAt ? (
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[10px] font-black uppercase text-gray-400 group-hover:text-(--accent) transition-colors truncate max-w-[150px]">
+                          {item.lastPostAuthor || "Unknown"}
+                        </span>
+                        <span className="text-[9px] font-mono text-gray-600">
+                          {item.lastPostAt.toDate().toLocaleDateString()}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[9px] font-black uppercase text-gray-700">None</span>
+                    )}
+                  </td>
                   <td className="text-[10px] text-(--text-secondary) font-black uppercase tracking-widest py-5 opacity-40 group-hover:opacity-100 transition-opacity">
                     {item.description}
                   </td>
@@ -392,6 +444,9 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
     try {
       await deleteDoc(doc(db, `forums/${forumId}/threads`, threadId));
       await updateDoc(doc(db, "forums", forumId), { threadCount: increment(-1) });
+      await updateDoc(doc(db, "settings", "forum_stats"), {
+        threads: increment(-1)
+      }).catch(() => {});
       toast("success", "Topic Deleted", "The topic was deleted.");
     } catch (e) {
       toast("error", "Error", "Failed to delete topic.");
@@ -420,7 +475,7 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
         viewCount: 0
       });
 
-      // Add first post for internal tracking if needed, though we already have content in thread doc for this simple version
+      // Add first post
       await addDoc(collection(db, `threads/${threadRef.id}/posts`), {
         threadId: threadRef.id,
         authorId: auth.currentUser.uid,
@@ -428,6 +483,20 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
         content: newContent,
         createdAt: serverTimestamp()
       });
+
+      // Update forum metadata
+      await updateDoc(doc(db, "forums", forumId), {
+        threadCount: increment(1),
+        postCount: increment(1),
+        lastPostAt: serverTimestamp(),
+        lastPostAuthor: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || "Unknown"
+      });
+
+      // Update global stats
+      await updateDoc(doc(db, "settings", "forum_stats"), {
+        threads: increment(1),
+        posts: increment(1)
+      }).catch(() => {}); // Ignore if doc doesn't exist
 
       setNewTitle("");
       setNewContent("");
@@ -447,13 +516,13 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
           <ChevronRight size={10} />
           <span className="text-white">{forum?.name || "..."}</span>
         </div>
-        <div className="flex justify-between items-center bg-black/20 p-4 border border-(--border-color) border-t-0">
-          <div className="flex items-center gap-4 flex-1">
-            <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-black/20 p-4 border border-(--border-color) border-t-0 gap-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 flex-1 w-full">
+            <div className="flex items-center gap-2 shrink-0">
               <MessageSquare size={16} className="text-(--accent)" />
-              <h2 className="text-lg font-black uppercase italic tracking-wider">{forum?.name || "Loading..."}</h2>
+              <h2 className="text-base sm:text-lg font-black uppercase italic tracking-wider truncate max-w-[200px] sm:max-w-none">{forum?.name || "Loading..."}</h2>
             </div>
-            <div className="relative w-full max-w-xs ml-4">
+            <div className="relative w-full sm:max-w-xs sm:ml-4">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" size={14} />
               <input 
                 value={searchQuery}
@@ -466,7 +535,7 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
           {auth.currentUser && (
             <button 
               onClick={() => setShowCreate(!showCreate)}
-              className="bg-(--accent) text-black px-4 py-1 text-[10px] font-black uppercase tracking-widest hover:bg-white transition-colors ml-4"
+              className="w-full sm:w-auto bg-(--accent) text-black px-4 py-2 sm:py-1 text-[10px] font-black uppercase tracking-widest hover:bg-white transition-colors"
             >
               {showCreate ? "Cancel" : "New Thread"}
             </button>
@@ -602,12 +671,15 @@ function ForumSection({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean
 
 function ThreadView({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean }) {
   const { forumId, threadId } = useParams();
+  const navigate = useNavigate();
   const [thread, setThread] = useState<any>(null);
   const [posts, setPosts] = useState<any[]>([]);
   const [reply, setReply] = useState("");
   const [loading, setLoading] = useState(true);
   const [reportingPost, setReportingPost] = useState<any | null>(null);
   const [reportReason, setReportReason] = useState("");
+  const [editingPost, setEditingPost] = useState<any | null>(null);
+  const [editContent, setEditContent] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -677,13 +749,34 @@ function ThreadView({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean }
     }
 
     try {
-      await addDoc(collection(db, `threads/${threadId}/posts`), {
+      const postRef = await addDoc(collection(db, `threads/${threadId}/posts`), {
         threadId,
         authorId: auth.currentUser.uid,
         authorName: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || "Unknown",
         content: reply,
         createdAt: serverTimestamp()
       });
+
+      // Update thread metadata
+      await updateDoc(doc(db, `forums/${forumId}/threads`, threadId), {
+        replyCount: increment(1),
+        lastPostAt: serverTimestamp(),
+        lastPostAuthor: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || "Unknown",
+        lastPostId: postRef.id
+      });
+
+      // Update forum metadata
+      await updateDoc(doc(db, "forums", forumId), {
+        postCount: increment(1),
+        lastPostAt: serverTimestamp(),
+        lastPostAuthor: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || "Unknown"
+      });
+
+      // Update global stats
+      await updateDoc(doc(db, "settings", "forum_stats"), {
+        posts: increment(1)
+      }).catch(() => {});
+
       setReply("");
       toast("success", "Reply Posted", "Your message has been added to the thread.");
     } catch (e) {
@@ -699,6 +792,25 @@ function ThreadView({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean }
       toast("success", "Post Deleted", "The specific post was removed from the thread.");
     } catch (e) {
       toast("error", "Error", "Failed to request post deletion.");
+    }
+  };
+
+  const deleteThread = async (id: string) => {
+    if (!forumId || !id || !isStaff || !window.confirm("Are you sure you want to delete this entire topic? This cannot be undone.")) return;
+    try {
+      await deleteDoc(doc(db, `forums/${forumId}/threads`, id));
+      await updateDoc(doc(db, "forums", forumId), {
+        threadCount: increment(-1)
+      });
+      // Also update global stats
+      await updateDoc(doc(db, "settings", "forum_stats"), {
+        threads: increment(-1)
+      }).catch(() => {});
+
+      toast("success", "Topic Deleted", "The topic has been permanently removed.");
+      navigate(`/forum/${forumId}`);
+    } catch (e) {
+      toast("error", "Error", "Failed to delete the topic.");
     }
   };
 
@@ -721,6 +833,22 @@ function ThreadView({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean }
     } catch (err) {
       console.error(err);
       toast("error", "Error", "Failed to file report.");
+    }
+  };
+
+  const handleEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPost || !editContent || !threadId) return;
+    try {
+      await updateDoc(doc(db, `threads/${threadId}/posts`, editingPost.id), {
+        content: editContent,
+        updatedAt: serverTimestamp(),
+        edited: true
+      });
+      toast("success", "Post Updated", "Your changes have been saved.");
+      setEditingPost(null);
+    } catch (e) {
+      toast("error", "Error", "Failed to update post.");
     }
   };
 
@@ -772,6 +900,12 @@ function ThreadView({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean }
               {thread?.locked ? <Unlock size={12} /> : <Lock size={12} />}
               {thread?.locked ? 'Unlock' : 'Lock Thread'}
             </button>
+            <button 
+              onClick={() => deleteThread(threadId || "")}
+              className="px-4 py-1.5 text-[10px] font-black uppercase tracking-widest border border-red-500/50 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white transition-all flex items-center gap-2"
+            >
+              <Trash2 size={12} /> Delete Topic
+            </button>
           </div>
         )}
       </div>
@@ -791,9 +925,39 @@ function ThreadView({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean }
             isStaff={isStaff}
             onDelete={deletePost}
             onReport={() => setReportingPost(p)}
+            onEdit={(post: any) => {
+              setEditingPost(post);
+              setEditContent(post.content);
+            }}
           />
         ))}
       </div>
+
+      {editingPost && (
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
+          <div className="portal-card w-full max-w-2xl">
+            <div className="portal-header flex justify-between items-center">
+              <span>Edit Post</span>
+              <button onClick={() => setEditingPost(null)}><X size={16} /></button>
+            </div>
+            <form onSubmit={handleEdit} className="p-6 flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black uppercase text-gray-500">Post Content</label>
+                <textarea 
+                  required
+                  value={editContent}
+                  onChange={e => setEditContent(e.target.value)}
+                  className="bg-black/40 border border-white/10 p-3 text-sm min-h-[300px] outline-none focus:border-(--accent) transition-colors"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={() => setEditingPost(null)} className="px-4 py-2 text-[10px] font-bold uppercase transition-colors hover:bg-white/5">Cancel</button>
+                <button type="submit" className="bg-(--accent) text-black px-6 py-2 text-[10px] font-black uppercase tracking-widest hover:opacity-80 transition-colors">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {reportingPost && (
         <div className="fixed inset-0 bg-black/90 flex items-center justify-center p-4 z-50">
@@ -822,9 +986,9 @@ function ThreadView({ isStaff, isMuted }: { isStaff: boolean; isMuted: boolean }
         </div>
       )}
 
-      {auth.currentUser && !thread?.locked ? (
+      {auth.currentUser && (!thread?.locked || isStaff) ? (
         <div className="portal-card">
-          <div className="portal-header">Quick Reply</div>
+          <div className="portal-header">Quick Reply {thread?.locked && <span className="text-red-500 ml-2">[LOCKED - STAFF OVERRIDE]</span>}</div>
           <form onSubmit={handleReply} className="p-4 flex flex-col gap-3">
             <textarea 
               required
@@ -888,18 +1052,18 @@ function RecentActivityList() {
          <Link 
            key={act.id} 
            to={`/forum/thread/${act.forumId}/${act.id}`}
-           className="flex items-center justify-between p-4 px-6 hover:bg-(--accent)/5 transition-all group"
+           className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 px-6 hover:bg-(--accent)/5 transition-all group gap-3"
          >
             <div className="flex flex-col">
-               <span className="text-sm font-black uppercase italic group-hover:text-(--accent) transition-colors">{act.title}</span>
+               <span className="text-sm font-black uppercase italic group-hover:text-(--accent) transition-colors truncate">{act.title}</span>
                <div className="flex items-center gap-2 text-[9px] font-black uppercase text-gray-600 mt-1">
                   <span>By {act.authorName}</span>
                   <span className="opacity-20">•</span>
                   <span>In {act.forumId ? <ForumName forumId={act.forumId} /> : "Unknown"}</span>
                </div>
             </div>
-            <div className="text-right flex flex-col">
-               <span className="text-[10px] font-mono font-bold text-gray-500">{act.createdAt?.toDate().toLocaleDateString()}</span>
+            <div className="text-left sm:text-right flex flex-row sm:flex-col gap-4 sm:gap-0 shrink-0">
+               <span className="text-[10px] font-mono font-bold text-gray-500">{act.createdAt?.toDate ? act.createdAt.toDate().toLocaleDateString() : "NEW"}</span>
                <span className="text-[9px] font-black uppercase text-emerald-500/40">{act.replyCount || 0} REPLIES</span>
             </div>
          </Link>
@@ -918,8 +1082,9 @@ function ForumName({ forumId }: { forumId: string }) {
   return <span>{name}</span>;
 }
 
-function Post({ index, id, author, authorId, rank, avatar, content, date, isStaff, onDelete, onReport }: any) {
+function Post({ index, id, author, authorId, rank, avatar, content, date, isStaff, onDelete, onReport, onEdit }: any) {
   const [authorData, setAuthorData] = useState<any>(null);
+  const isOwner = auth.currentUser?.uid === authorId;
 
   useEffect(() => {
     if (authorId) {
@@ -945,12 +1110,24 @@ function Post({ index, id, author, authorId, rank, avatar, content, date, isStaf
           </div>
           <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-emerald-500 border-4 border-black rounded-full" title="Online" />
         </div>
-        <div className="flex flex-col items-center gap-1 text-center">
+          <div className="flex flex-col items-center gap-1 text-center">
           <span className="font-black uppercase tracking-tight text-white group-hover:text-(--accent) transition-colors text-lg italic truncate max-w-[180px]">{author}</span>
-          <span className={clsx(
-            "text-[9px] font-black uppercase tracking-[0.3em] px-3 py-1 border leading-none shadow-sm",
-            rank === 'Thread Starter' ? "bg-(--accent)/10 border-(--accent) text-(--accent) neon-shadow" : "bg-white/5 border-white/10 text-gray-500"
-          )}>{authorData?.role || rank}</span>
+          <div className="flex flex-col gap-2 items-center">
+            <span className={clsx(
+              "text-[9px] font-black uppercase tracking-[0.3em] px-3 py-1 border leading-none shadow-sm",
+              rank === 'Thread Starter' ? "bg-(--accent)/10 border-(--accent) text-(--accent) neon-shadow" : "bg-white/5 border-white/10 text-gray-500"
+            )}>{authorData?.role || rank}</span>
+            
+            {authorData?.tags && authorData.tags.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-1">
+                {authorData.tags.map((tag: string, i: number) => (
+                  <span key={i} className="text-[7px] font-black uppercase tracking-widest bg-white/10 border border-white/20 text-white/70 px-1 py-0.5 rounded-[1px] hover:bg-white/20 transition-colors">
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
         <div className="mt-2 w-full flex flex-col gap-1.5 border-t border-white/5 pt-3">
           <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-gray-600">
@@ -964,15 +1141,20 @@ function Post({ index, id, author, authorId, rank, avatar, content, date, isStaf
         </div>
       </aside>
       <div className="flex-1 p-8 relative flex flex-col">
-        <div className="flex justify-between items-center mb-6 text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 border-b border-white/5 pb-3">
+        <div className="flex justify-between items-start md:items-center mb-6 text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 border-b border-white/5 pb-3 flex-col sm:flex-row gap-4">
           <div className="flex items-center gap-3">
              <span className="bg-white/5 px-2 py-0.5 text-gray-400">#{index}</span>
-             <span className="opacity-40 tracking-widest whitespace-nowrap">Posted on: {date}</span>
+             <span className="opacity-40 tracking-widest whitespace-nowrap overflow-hidden text-ellipsis">Posted on: {date}</span>
           </div>
-          <div className="flex gap-4 opacity-40 group-hover:opacity-100 transition-opacity">
+          <div className="flex gap-4 opacity-70 md:opacity-40 group-hover:opacity-100 transition-opacity flex-wrap justify-start sm:justify-end">
             {isStaff && onDelete && id && (
               <button onClick={() => onDelete(id)} className="text-red-500 hover:text-red-400 flex items-center gap-1 transition-colors">
                 <Trash2 size={12} /> Delete
+              </button>
+            )}
+            {(isOwner || isStaff) && onEdit && (
+              <button onClick={() => onEdit({ id, content })} className="hover:text-(--accent) transition-all flex items-center gap-1">
+                 <Edit3 size={11} /> Edit
               </button>
             )}
             <button className="hover:text-white transition-all flex items-center gap-1">

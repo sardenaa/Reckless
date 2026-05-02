@@ -2,11 +2,12 @@ import React, { useState, useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route, Link, NavLink as RouterNavLink } from "react-router-dom";
 import { onAuthStateChanged, User } from "firebase/auth";
 import { auth, db } from "./lib/firebase";
-import { doc, getDoc, query, collection, orderBy, limit, onSnapshot, collectionGroup } from "firebase/firestore";
+import { doc, getDoc, query, collection, orderBy, limit, onSnapshot, collectionGroup, updateDoc } from "firebase/firestore";
 import { Terminal, Users, MessageSquare, Trophy, CreditCard, LayoutDashboard, Menu, X, LogIn, UserPlus, Sun, Moon, ShieldAlert, Gavel, Calendar, ChevronRight } from "lucide-react";
 import { io } from "socket.io-client";
 import { clsx } from "clsx";
 import { motion, AnimatePresence } from "motion/react";
+import { handleFirestoreError, OperationType } from "./lib/firestore-errors";
 import Home from "./pages/Home";
 import Forum from "./pages/Forum";
 import Highscores from "./pages/Highscores";
@@ -22,6 +23,7 @@ import EventDetails from "./pages/EventDetails";
 import { ToastProvider } from "./components/Toast";
 import CustomCursor from "./components/CustomCursor";
 
+import { BRANDING } from "./constants";
 const socket = io();
 
 export default function App() {
@@ -46,6 +48,7 @@ export default function App() {
   useEffect(() => {
     let unsubUserData: (() => void) | null = null;
     let unsubBanData: (() => void) | null = null;
+    let heartbeat: any = null;
 
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
@@ -57,9 +60,26 @@ export default function App() {
         unsubBanData();
         unsubBanData = null;
       }
+      if (heartbeat) {
+        clearInterval(heartbeat);
+        heartbeat = null;
+      }
 
       if (u) {
-        unsubUserData = onSnapshot(doc(db, "users", u.uid), (snap) => {
+        // Update activity initially
+        const userRef = doc(db, "users", u.uid);
+        updateDoc(userRef, { lastActive: new Date() }).catch((err) => {
+          handleFirestoreError(err, OperationType.UPDATE, `users/${u.uid}`);
+        });
+        
+        // Activity heartbeat
+        heartbeat = setInterval(() => {
+          updateDoc(userRef, { lastActive: new Date() }).catch((err) => {
+            handleFirestoreError(err, OperationType.UPDATE, `users/${u.uid}`);
+          });
+        }, 120000); // 2 minutes
+
+        unsubUserData = onSnapshot(userRef, (snap) => {
           if (snap.exists()) {
             const data = snap.data();
             const isAdminRole = ['Admin', 'Super Admin'].includes(data.role);
@@ -72,6 +92,8 @@ export default function App() {
             const isModerator = ['Moderator', 'Forum Moderator', 'Server Manager'].includes(data.role);
             setIsAdmin(isAdminRole || isModerator || !!hasStaffPerms);
           }
+        }, (err) => {
+          handleFirestoreError(err, OperationType.GET, `users/${u.uid}`);
         });
 
         // Detect Bans
@@ -104,6 +126,8 @@ export default function App() {
             setIsBanned(false);
             setBanData(null);
           }
+        }, (err) => {
+          handleFirestoreError(err, OperationType.GET, `bans/${u.uid}`);
         });
         
         const adminDoc = await getDoc(doc(db, "admins", u.uid));
@@ -123,6 +147,7 @@ export default function App() {
     return () => {
       unsubscribe();
       socket.off("server_stats");
+      if (heartbeat) clearInterval(heartbeat);
     };
   }, []);
 
@@ -305,17 +330,17 @@ export default function App() {
         </AnimatePresence>
 
         <header className="bg-black border-b-2 border-(--accent) px-4 md:px-6 py-4 md:py-6 flex items-center justify-between z-50 sticky top-0 shadow-[0_4px_30px_rgba(0,0,0,0.5)]">
-          <Link to="/" className="flex items-center gap-3 md:gap-4 group">
-            <div className="relative">
-              <div className="w-10 h-10 md:w-12 md:h-12 bg-white flex items-center justify-center transform -rotate-12 group-hover:rotate-0 transition-transform duration-500 shadow-xl">
-                 <Terminal className="text-black w-6 h-6 md:w-8 md:h-8" />
+          <Link to="/" className="flex items-center gap-2 md:gap-4 group min-w-0">
+            <div className="relative shrink-0">
+              <div className="w-8 h-8 md:w-12 md:h-12 bg-white flex items-center justify-center transform -rotate-12 group-hover:rotate-0 transition-transform duration-500 shadow-xl">
+                 <Terminal className="text-black w-5 h-5 md:w-8 md:h-8" />
               </div>
             </div>
-            <div className="flex flex-col">
-              <span className="font-display text-2xl md:text-4xl font-normal tracking-tight uppercase italic leading-none text-white whitespace-nowrap">
-                ReckLess <span className="text-(--accent)">RolePlay</span>
+            <div className="flex flex-col min-w-0">
+              <span className="font-display text-lg sm:text-2xl md:text-4xl font-normal tracking-tight uppercase italic leading-none text-white whitespace-nowrap overflow-hidden text-ellipsis">
+                {BRANDING.NAME.split(' ')[0]} <span className="text-(--accent) hidden xs:inline sm:inline">{BRANDING.NAME.split(' ').slice(1).join(' ')}</span>
               </span>
-              <span className="text-[8px] md:text-[10px] font-mono tracking-[0.3em] md:tracking-[0.5em] text-(--accent) opacity-60 uppercase font-bold">Operation_Portal_v2.0</span>
+              <span className="text-[7px] md:text-[10px] font-mono tracking-[0.2em] md:tracking-[0.5em] text-(--accent) opacity-60 uppercase font-bold truncate">Operation_Portal_{BRANDING.VERSION}</span>
             </div>
           </Link>
 
@@ -328,28 +353,28 @@ export default function App() {
             <TopbarLink to="/donations" icon={<CreditCard size={16} />} label="Donate" />
           </nav>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4 shrink-0">
             <button 
               onClick={toggleTheme}
-              className="p-2 rounded-full hover:bg-white/5 transition-colors text-(--text-secondary)"
+              className="p-1.5 sm:p-2 rounded-full hover:bg-white/5 transition-colors text-(--text-secondary)"
               title="Toggle Theme"
             >
-              {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+              {theme === "dark" ? <Sun size={16} className="sm:w-[18px] sm:h-[18px]" /> : <Moon size={16} className="sm:w-[18px] sm:h-[18px]" />}
             </button>
 
             {user ? (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 sm:gap-4">
                 {isAdmin && (
-                  <Link to="/admin" className="text-red-500 hover:text-red-400 transition-colors flex items-center gap-1 text-xs font-black uppercase tracking-tighter">
-                    <ShieldAlert size={14} /> Admin
+                  <Link to="/admin" className="text-red-500 hover:text-red-400 transition-colors flex items-center gap-1 text-[10px] sm:text-xs font-black uppercase tracking-tighter">
+                    <ShieldAlert size={12} className="sm:w-3.5 sm:h-3.5" /> <span className="hidden xs:inline">Admin</span>
                   </Link>
                 )}
                 <div className="relative group">
-                  <Link to={`/profile/${user.uid}`} className="flex items-center gap-2 px-3 py-1 bg-white/5 hover:bg-white/10 border border-(--border-color) transition-colors">
-                    <div className="w-6 h-6 bg-(--accent)/20 border border-(--accent)/50 flex items-center justify-center text-[10px] font-mono">
+                  <Link to={`/profile/${user.uid}`} className="flex items-center gap-2 px-2 py-1 bg-white/5 hover:bg-white/10 border border-(--border-color) transition-colors">
+                    <div className="w-5 h-5 sm:w-6 sm:h-6 bg-(--accent)/20 border border-(--accent)/50 flex items-center justify-center text-[8px] sm:text-[10px] font-mono">
                       {user.displayName?.[0] || user.email?.[0] || "?"}
                     </div>
-                    <span className="text-xs font-mono hidden sm:inline">{user.displayName || user.email?.split('@')[0]}</span>
+                    <span className="text-[10px] font-mono hidden sm:inline">{user.displayName || user.email?.split('@')[0]}</span>
                   </Link>
                   <div className="absolute right-0 top-full mt-2 w-48 bg-(--card-bg) border border-(--border-color) hidden group-hover:flex flex-col z-[100] shadow-2xl">
                     <button 
@@ -362,18 +387,17 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <div className="flex items-center gap-2">
-                <Link to="/login" className="flex items-center gap-1 text-xs font-bold uppercase hover:text-(--accent) transition-colors">
-                  <LogIn size={14} /> Login
+              <div className="flex items-center gap-3 sm:gap-4">
+                <Link to="/login" className="flex items-center gap-1 text-[10px] sm:text-xs font-bold uppercase hover:text-(--accent) transition-colors">
+                  <LogIn size={14} /> <span className="hidden xs:inline">Login</span>
                 </Link>
-                <span className="opacity-20">/</span>
-                <Link to="/register" className="flex items-center gap-1 text-xs font-bold uppercase hover:text-(--accent) transition-colors">
-                  <UserPlus size={14} /> Join
+                <Link to="/register" className="flex items-center gap-1 text-[10px] sm:text-xs font-bold uppercase hover:text-(--accent) transition-colors group">
+                  <UserPlus size={14} className="group-hover:scale-110 transition-transform" /> <span className="hidden xs:inline">Join</span>
                 </Link>
               </div>
             )}
-            <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-              {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            <button className="md:hidden p-1 bg-white/5 border border-white/10 rounded-sm hover:bg-white/10 transition-colors" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+              {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
           </div>
         </header>
@@ -383,7 +407,7 @@ export default function App() {
           <div className="flex gap-12 whitespace-nowrap animate-marquee font-display text-xs items-center uppercase italic font-medium">
              <span className="text-(--accent) flex items-center gap-2"><div className="w-2 h-2 bg-(--accent) animate-pulse rounded-full" /> Status: Server Online</span>
              <span>// Current News: New updates recently added</span>
-             <span>// Connect: ReckLessRP.Net:7777</span>
+             <span>// Connect: {BRANDING.DOMAIN}:{BRANDING.PORT}</span>
              <span>// Message: Welcome to our community</span>
              <span className="text-(--accent) flex items-center gap-2"><div className="w-2 h-2 bg-(--accent) animate-pulse rounded-full" /> Status: Server Online</span>
           </div>
@@ -443,10 +467,10 @@ export default function App() {
 
             <SidebarWidget title="Social Links">
               <div className="grid grid-cols-2 gap-2 text-[10px] font-bold uppercase">
-                <a href="https://discord.gg/gypVSQZjd5" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center p-2 bg-[#5865F2]/10 border border-[#5865F2]/20 hover:bg-[#5865F2]/20 transition-colors">Discord</a>
-                <a href="#" className="flex items-center justify-center p-2 bg-[#1DA1F2]/10 border border-[#1DA1F2]/20 hover:bg-[#1DA1F2]/20 transition-colors">Twitter</a>
-                <a href="#" className="flex items-center justify-center p-2 bg-[#FF0000]/10 border border-[#FF0000]/20 hover:bg-[#FF0000]/20 transition-colors">YouTube</a>
-                <a href="#" className="flex items-center justify-center p-2 bg-[#E1306C]/10 border border-[#E1306C]/20 hover:bg-[#E1306C]/20 transition-colors">Instagram</a>
+                <a href={BRANDING.DISCORD_URL} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center p-2 bg-[#5865F2]/10 border border-[#5865F2]/20 hover:bg-[#5865F2]/20 transition-colors">Discord</a>
+                <a href={BRANDING.TWITTER_URL} className="flex items-center justify-center p-2 bg-[#1DA1F2]/10 border border-[#1DA1F2]/20 hover:bg-[#1DA1F2]/20 transition-colors">Twitter</a>
+                <a href={BRANDING.YOUTUBE_URL} className="flex items-center justify-center p-2 bg-[#FF0000]/10 border border-[#FF0000]/20 hover:bg-[#FF0000]/20 transition-colors">YouTube</a>
+                <a href={BRANDING.INSTAGRAM_URL} className="flex items-center justify-center p-2 bg-[#E1306C]/10 border border-[#E1306C]/20 hover:bg-[#E1306C]/20 transition-colors">Instagram</a>
               </div>
             </SidebarWidget>
 
@@ -457,7 +481,7 @@ export default function App() {
         </main>
 
         <footer className="bg-(--line) border-t border-(--border-color) p-8 text-center text-(--text-secondary) text-xs">
-          <p className="mb-2 font-mono font-bold tracking-widest uppercase">ReckLess RolePlay &copy; 2026</p>
+          <p className="mb-2 font-mono font-bold tracking-widest uppercase">{BRANDING.NAME} &copy; {new Date().getFullYear()}</p>
           <p>Powered by Open.mp & Firebase. Not affiliated with Rockstar Games or Take-Two Interactive.</p>
         </footer>
       </div>

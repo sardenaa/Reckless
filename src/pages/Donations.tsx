@@ -4,6 +4,8 @@ import { clsx } from "clsx";
 import { motion, AnimatePresence } from "motion/react";
 import { useToast } from "../components/Toast";
 
+import { BRANDING } from "../constants";
+
 export default function Donations() {
   const [selectedTier, setSelectedTier] = useState<any>(null);
 
@@ -271,7 +273,7 @@ function CheckoutModal({ tier, onClose }: any) {
         <div className="bg-(--accent) text-black p-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <Lock size={14} />
-            <span className="text-xs font-black uppercase tracking-widest">Secure Uplink Portal v4.2</span>
+            <span className="text-xs font-black uppercase tracking-widest">Secure Uplink Portal v{BRANDING.VERSION}</span>
           </div>
           <button onClick={onClose}><X size={18} /></button>
         </div>

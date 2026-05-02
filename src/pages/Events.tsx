@@ -73,7 +73,7 @@ export default function Events() {
               <select 
                 value={typeFilter}
                 onChange={(e) => setTypeFilter(e.target.value)}
-                className="bg-black/40 border border-white/5 pl-8 pr-12 py-2 text-[10px] font-black uppercase tracking-widest outline-none focus:border-pink-500 transition-colors appearance-none"
+                className="bg-black/40 border border-white/5 pl-8 pr-12 py-2 text-[10px] font-black uppercase tracking-widest outline-none focus:border-(--accent) transition-colors appearance-none"
               >
                 {eventTypes.map(type => (
                   <option key={type} value={type}>{type}</option>
@@ -86,7 +86,7 @@ export default function Events() {
 
       {loading ? (
         <div className="flex justify-center p-20">
-          <div className="w-10 h-10 border-4 border-pink-500 border-t-transparent rounded-full animate-spin"></div>
+          <div className="w-10 h-10 border-4 border-(--accent) border-t-transparent rounded-full animate-spin"></div>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

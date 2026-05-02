@@ -6,6 +6,8 @@
   --font-display: "Space Grotesk", sans-serif;
   --font-marker: "Permanent Marker", cursive;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --breakpoint-xs: 480px;
 }
 
 @layer base {

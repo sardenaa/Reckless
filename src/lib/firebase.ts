@@ -1,25 +1,28 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { getFirestore, doc, getDocFromServer } from "firebase/firestore";
+import { initializeFirestore, doc, getDocFromServer } from "firebase/firestore";
 import firebaseConfig from "../../firebase-applet-config.json";
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+}, firebaseConfig.firestoreDatabaseId || "(default)");
 
-// Test Connection (disabled by default to avoid noise, enable for debugging)
-/*
+// Test Connection
 async function testConnection() {
   try {
     await getDocFromServer(doc(db, "test", "connection"));
+    console.log("Firestore connection successful.");
   } catch (error) {
     if (error instanceof Error && error.message.includes("offline")) {
       console.error("Please check your Firebase configuration: Firestore appears to be offline.");
+    } else {
+      console.error("Firestore connectivity check failed:", error);
     }
   }
 }
 testConnection();
-*/
 
 // Global Error Handler for Firestore
 export enum OperationType {

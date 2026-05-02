@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import { User, Shield, Briefcase, Clock, Calendar, Hash, MapPin, Award, Edit3, Check, X, MessageSquare } from "lucide-react";
 import { auth, db } from "../lib/firebase";
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, orderBy, limit, collectionGroup, onSnapshot } from "firebase/firestore";
+import { Link } from "react-router-dom";
 import { clsx } from "clsx";
 import { motion, AnimatePresence } from "motion/react";
 import { useToast } from "../components/Toast";
@@ -10,9 +11,13 @@ import { useToast } from "../components/Toast";
 export default function Profile() {
   const { uid } = useParams();
   const [isEditing, setIsEditing] = useState(false);
-  const [username, setUsername] = useState("Snake");
+  const [username, setUsername] = useState("Loading...");
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagsInput, setTagsInput] = useState("");
   const [skinId, setSkinId] = useState(294);
+  const [forumSignature, setForumSignature] = useState("");
   const [userRole, setUserRole] = useState("User");
+  const [currentUserRole, setCurrentUserRole] = useState("User");
   const [stats, setStats] = useState({ 
     money: 0, 
     bank: 0,
@@ -40,7 +45,10 @@ export default function Profile() {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setUsername(data.username || "Unknown");
+          setTags(data.tags || []);
+          setTagsInput((data.tags || []).join(", "));
           setSkinId(data.skin || 294);
+          setForumSignature(data.signature || "");
           setUserRole(data.role || "User");
           setStats({
             money: data.money || 500,
@@ -55,6 +63,14 @@ export default function Profile() {
             faction: data.faction || "None",
             materials: data.materials || 0
           });
+        }
+        
+        // Fetch current user's role to check for staff permissions
+        if (auth.currentUser) {
+          const selfSnap = await getDoc(doc(db, "users", auth.currentUser.uid));
+          if (selfSnap.exists()) {
+            setCurrentUserRole(selfSnap.data().role || "User");
+          }
         }
 
         // Fetch assets
@@ -77,10 +93,21 @@ export default function Profile() {
     if (!uid) return;
     try {
       const userRef = doc(db, "users", uid);
-      await updateDoc(userRef, {
+      const newTags = tagsInput.split(',').map(t => t.trim()).filter(t => t !== "");
+      
+      const updateData: any = {
         username,
-        skin: skinId
-      });
+        skin: skinId,
+        signature: forumSignature || ""
+      };
+      
+      // Only update tags if user is staff (security rules should also enforce this)
+      if (isStaff) {
+        updateData.tags = newTags;
+        setTags(newTags);
+      }
+
+      await updateDoc(userRef, updateData);
       toast("success", "Profile Updated", "Your profile changes have been saved successfully.");
       setIsEditing(false);
     } catch (e) {
@@ -90,17 +117,20 @@ export default function Profile() {
     }
   };
 
+  const isStaff = ['Admin', 'Super Admin', 'Moderator', 'Forum Moderator', 'Server Manager'].includes(currentUserRole);
+  const canEdit = isOwner || isStaff;
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between mb-4 pb-4 border-b border-white/5 gap-4">
         <div className="flex items-center gap-4">
             <div className="w-4 h-16 bg-(--accent) transform -rotate-12" />
               <div className="flex flex-col">
-                <h1 className="text-3xl sm:text-5xl font-display italic font-normal uppercase tracking-tight text-white leading-none">CHARACTER DOSSIER</h1>
+                <h1 className="text-2xl xs:text-3xl sm:text-5xl font-display italic font-normal uppercase tracking-tight text-white leading-none">CHARACTER DOSSIER</h1>
                 <span className="text-[10px] sm:text-sm font-marker text-(--accent) -rotate-1 ml-1 sm:ml-2">Internal identity token: {uid?.slice(0, 12).toUpperCase()}</span>
               </div>
         </div>
-        {isOwner && (
+        {canEdit && (
           <div className="flex gap-3">
             {!isEditing ? (
               <button 
@@ -166,12 +196,32 @@ export default function Profile() {
                       className="w-full bg-black border border-white/10 p-3 text-center font-mono text-xs outline-none focus:border-(--accent) transition-all"
                     />
                   </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[9px] font-black uppercase text-gray-500 tracking-widest">Forum Signature</label>
+                    <textarea 
+                      value={forumSignature} 
+                      onChange={e => setForumSignature(e.target.value)}
+                      className="w-full bg-black border border-white/10 p-3 text-[10px] min-h-[80px] font-mono outline-none focus:border-(--accent) transition-all"
+                      placeholder="Markdown supported..."
+                    />
+                  </div>
+                  {isStaff && (
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-black uppercase text-red-500 tracking-widest">Staff: Player Tags (Comma Separated)</label>
+                        <input 
+                          value={tagsInput} 
+                          onChange={e => setTagsInput(e.target.value)}
+                          className="w-full bg-black border border-red-500/30 p-3 text-[10px] font-mono outline-none focus:border-red-500 transition-all"
+                          placeholder="VIP, Veteran, Helper..."
+                        />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="flex flex-col items-center gap-4">
                   <div className="text-center">
                     <h2 className="text-4xl font-black uppercase tracking-tighter italic font-display mb-1 neon-text">{username}</h2>
-                    <div className="flex items-center justify-center gap-4 mt-4">
+                    <div className="flex flex-col items-center gap-3 mt-4">
                       <span className={clsx(
                         "text-[10px] px-4 py-1.5 font-black uppercase tracking-[0.2em] border-2 italic font-display",
                         userRole === 'Super Admin' ? "bg-purple-500/10 border-purple-500 text-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.2)]" :
@@ -182,6 +232,16 @@ export default function Profile() {
                       )}>
                         {userRole}
                       </span>
+
+                      {tags.length > 0 && (
+                        <div className="flex flex-wrap justify-center gap-1.5">
+                          {tags.map((tag, i) => (
+                            <span key={i} className="text-[8px] font-black uppercase tracking-widest bg-white/10 border border-white/20 text-white px-2 py-0.5 rounded-sm shadow-sm">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="w-full h-px bg-white/5 my-2" />
@@ -269,6 +329,13 @@ export default function Profile() {
           </div>
 
           <div className="portal-card">
+            <div className="portal-header">Latest Forum Activity</div>
+            <div className="p-0">
+               <UserForumActivity uid={uid} />
+            </div>
+          </div>
+
+          <div className="portal-card">
             <div className="portal-header">Achievements & Awards</div>
             <div className="p-8 flex items-center justify-center gap-12 flex-wrap opacity-40 hover:opacity-100 transition-opacity">
               <AwardBadge icon={<Award />} label="Veteran" />
@@ -334,6 +401,54 @@ function AwardBadge({ icon, label }: any) {
         {icon}
       </div>
       <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
+    </div>
+  );
+}
+
+function UserForumActivity({ uid }: { uid?: string }) {
+  const [activity, setActivity] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!uid) return;
+    const q = query(
+      collectionGroup(db, "threads"),
+      where("authorId", "==", uid),
+      orderBy("createdAt", "desc"),
+      limit(5)
+    );
+    
+    const unsub = onSnapshot(q, (snap) => {
+      setActivity(snap.docs.map(doc => ({ id: doc.id, ...doc.data() as any })));
+      setLoading(false);
+    });
+    
+    return () => unsub();
+  }, [uid]);
+
+  if (loading) return <div className="p-8 flex justify-center"><div className="w-4 h-4 border-2 border-(--accent) border-t-transparent rounded-full animate-spin"></div></div>;
+
+  return (
+    <div className="divide-y divide-white/5">
+       {activity.length === 0 ? (
+         <div className="p-8 text-center text-[10px] font-bold uppercase text-gray-700 italic border border-dashed border-white/5 m-4">No forum activity recorded for this user.</div>
+       ) : activity.map(act => (
+         <Link 
+           key={act.id} 
+           to={`/forum/thread/${act.forumId}/${act.id}`}
+           className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 px-6 hover:bg-(--accent)/5 transition-all group gap-3"
+         >
+            <div className="flex flex-col min-w-0 flex-1">
+               <span className="text-[11px] font-black uppercase italic group-hover:text-(--accent) transition-colors truncate">{act.title}</span>
+               <div className="flex items-center gap-2 text-[8px] font-black uppercase text-gray-600 mt-1">
+                  <span>Broadcasted in {act.forumId?.toUpperCase()}</span>
+               </div>
+            </div>
+            <div className="text-left sm:text-right shrink-0">
+               <span className="text-[10px] font-mono font-bold text-gray-500">{act.createdAt?.toDate ? act.createdAt.toDate().toLocaleDateString() : "..."}</span>
+            </div>
+         </Link>
+       ))}
     </div>
   );
 }

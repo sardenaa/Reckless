@@ -32,7 +32,7 @@ export default function EventDetails() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center p-20 gap-4">
-        <div className="w-12 h-12 border-4 border-pink-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-12 h-12 border-4 border-(--accent) border-t-transparent rounded-full animate-spin" />
         <span className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-500 animate-pulse">Decrypting Mission Data...</span>
       </div>
     );
@@ -56,7 +56,7 @@ export default function EventDetails() {
 
   return (
     <div className="flex flex-col gap-8 max-w-4xl mx-auto">
-      <Link to="/events" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-600 hover:text-pink-500 transition-colors w-fit">
+      <Link to="/events" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-600 hover:text-(--accent) transition-colors w-fit">
         <ChevronLeft size={14} /> Back to Briefings
       </Link>
 
@@ -64,12 +64,12 @@ export default function EventDetails() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/5 pb-8">
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-3">
-              <div className="bg-pink-500/10 p-2 border border-pink-500/20">
-                <Zap size={20} className="text-pink-500" />
+              <div className="bg-(--accent)/10 p-2 border border-(--accent)/20">
+                <Zap size={20} className="text-(--accent)" />
               </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-pink-500">{event.type}</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-(--accent)">{event.type}</span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter italic leading-none group-hover:text-pink-500 transition-colors">
+            <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter italic leading-none group-hover:text-(--accent) transition-colors">
               {event.title}
             </h1>
           </div>
@@ -90,7 +90,7 @@ export default function EventDetails() {
                 <span className="text-xs font-black uppercase tracking-widest">Aborted</span>
               </div>
             ) : (
-              <div className="bg-pink-500/10 text-pink-500 border border-pink-500/30 px-6 py-2 rounded-sm">
+              <div className="bg-(--accent)/10 text-(--accent) border border-(--accent)/30 px-6 py-2 rounded-sm">
                 <span className="text-xs font-black uppercase tracking-widest">Scheduled Deployment</span>
               </div>
             )}
@@ -104,7 +104,7 @@ export default function EventDetails() {
                 <Info size={14} /> Mission Briefing
               </div>
               <div className="p-8">
-                <p className="text-gray-400 leading-relaxed italic text-lg border-l-4 border-pink-500/50 pl-6 py-2">
+                <p className="text-gray-400 leading-relaxed italic text-lg border-l-4 border-(--accent)/50 pl-6 py-2">
                   "{event.description || "Mission briefing classified. No further details available at this time."}"
                 </p>
               </div>
@@ -127,8 +127,8 @@ export default function EventDetails() {
           </div>
 
           <aside className="flex flex-col gap-6">
-            <div className="portal-card shadow-xl border-pink-500/20">
-              <div className="portal-header bg-pink-500/5 text-pink-500 flex items-center gap-2">
+            <div className="portal-card shadow-xl border-(--accent)/20">
+              <div className="portal-header bg-(--accent)/5 text-(--accent) flex items-center gap-2">
                 <Clock size={14} /> Deployment Timer
               </div>
               <div className="p-6 flex flex-col gap-6">
@@ -150,7 +150,7 @@ export default function EventDetails() {
                     <div className="pt-4 border-t border-white/5 flex items-center justify-between">
                       <div className="flex flex-col">
                         <span className="text-[9px] font-black uppercase text-gray-600 tracking-widest block mb-1">Active Personnel</span>
-                        <div className="text-pink-500 font-black italic text-lg tracking-tighter">
+                        <div className="text-(--accent) font-black italic text-lg tracking-tighter">
                           {event.playerCount || 0} Registered
                         </div>
                       </div>
