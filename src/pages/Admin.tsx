@@ -3154,8 +3154,12 @@ function EventManagement() {
     prize: "",
     playerCount: 0,
     status: "scheduled",
-    creatorOverride: ""
+    creatorOverride: "",
+    tags: [] as string[],
+    bannerUrl: ""
   });
+  const [tagsInput, setTagsInput] = useState("");
+  const [editTagsInput, setEditTagsInput] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -3186,8 +3190,11 @@ function EventManagement() {
         }
       }
 
+      const tags = tagsInput.split(',').map(t => t.trim()).filter(t => t !== "");
+
       await addDoc(collection(db, "events"), {
         ...newEvent,
+        tags,
         playerCount: Number(newEvent.playerCount) || 0,
         startTime: new Date(newEvent.startTime).toISOString(),
         createdBy: auth.currentUser?.uid,
@@ -3196,7 +3203,8 @@ function EventManagement() {
       });
       await logActivity("Create Event", `New event scheduled: "${newEvent.title}" (${newEvent.type})`);
       setShowCreate(false);
-      setNewEvent({ title: "", type: "TDM", description: "", startTime: "", location: "", prize: "", playerCount: 0, status: "scheduled", creatorOverride: "" });
+      setNewEvent({ title: "", type: "TDM", description: "", startTime: "", location: "", prize: "", playerCount: 0, status: "scheduled", creatorOverride: "", tags: [], bannerUrl: "" });
+      setTagsInput("");
       toast("success", "Event Scheduled", "The in-game event has been added to the calendar.");
     } catch (err) {
       console.error(err);
@@ -3209,8 +3217,11 @@ function EventManagement() {
     if (!editingEvent) return;
     try {
       const { id, ...data } = editingEvent;
+      const tags = editTagsInput.split(',').map(t => t.trim()).filter(t => t !== "");
+      
       await updateDoc(doc(db, "events", id), {
         ...data,
+        tags,
         playerCount: Number(data.playerCount) || 0,
         updatedAt: serverTimestamp()
       });
@@ -3221,6 +3232,11 @@ function EventManagement() {
       console.error(err);
       toast("error", "Error", "Failed to update event.");
     }
+  };
+
+  const openEditModal = (ev: any) => {
+    setEditingEvent(ev);
+    setEditTagsInput(ev.tags ? ev.tags.join(", ") : "");
   };
 
   const addCategory = async () => {
@@ -3383,7 +3399,7 @@ function EventManagement() {
                 </td>
                 <td className="text-right">
                   <div className="flex justify-end gap-1">
-                    <button onClick={() => setEditingEvent(ev)} className="text-blue-500 hover:text-blue-400 p-2" title="Reconfigure Parameters"><Edit2 size={14} /></button>
+                    <button onClick={() => openEditModal(ev)} className="text-blue-500 hover:text-blue-400 p-2" title="Reconfigure Parameters"><Edit2 size={14} /></button>
                     <button onClick={() => setConfirmDelete(ev.id)} className="text-red-500 hover:text-red-400 p-2" title="Purge Record"><Trash2 size={14} /></button>
                   </div>
                 </td>
@@ -3471,6 +3487,26 @@ function EventManagement() {
                     className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-blue-500 font-mono"
                   />
                 </div>
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Event Tags (Comma Separated)</label>
+                <input 
+                  value={editTagsInput}
+                  onChange={e => setEditTagsInput(e.target.value)}
+                  className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-blue-500 font-bold"
+                  placeholder="Race, RP, PvP, Special..."
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black uppercase text-gray-500 tracking-widest">Banner / Thumbnail URL</label>
+                <input 
+                  value={editingEvent.bannerUrl || ""}
+                  onChange={e => setEditingEvent({...editingEvent, bannerUrl: e.target.value})}
+                  className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-blue-500 font-mono"
+                  placeholder="https://..."
+                />
               </div>
 
               <div className="flex flex-col gap-1">
@@ -3656,6 +3692,26 @@ function EventManagement() {
                   onChange={e => setNewEvent({...newEvent, creatorOverride: e.target.value})}
                   className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-(--accent)"
                   placeholder="Auto-detected if empty"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black uppercase text-gray-500">Event Tags (Comma Separated)</label>
+                <input 
+                  value={tagsInput}
+                  onChange={e => setTagsInput(e.target.value)}
+                  className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-(--accent)"
+                  placeholder="Race, RP, PvP, Special..."
+                />
+              </div>
+
+              <div className="flex flex-col gap-1">
+                <label className="text-[10px] font-black uppercase text-gray-500">Banner / Thumbnail URL</label>
+                <input 
+                  value={newEvent.bannerUrl}
+                  onChange={e => setNewEvent({...newEvent, bannerUrl: e.target.value})}
+                  className="bg-black/40 border border-white/10 p-3 text-sm outline-none focus:border-(--accent)"
+                  placeholder="https://..."
                 />
               </div>
 

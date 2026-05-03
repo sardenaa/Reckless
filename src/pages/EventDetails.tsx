@@ -1,33 +1,76 @@
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Calendar, Clock, MapPin, Trophy, ChevronLeft, Zap, Shield, User, Info, AlertTriangle, Users } from "lucide-react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { Calendar, Clock, MapPin, Trophy, ChevronLeft, Zap, Shield, User, Info, AlertTriangle, Users, CheckCircle2, LogIn } from "lucide-react";
+import { doc, getDoc, collection, onSnapshot, setDoc, deleteDoc, serverTimestamp } from "firebase/firestore";
+import { db, auth } from "../lib/firebase";
 import { clsx } from "clsx";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
+import { useToast } from "../components/Toast";
+import Countdown from "../components/Countdown";
 
 export default function EventDetails() {
   const { id } = useParams();
+  const { toast } = useToast();
   const [event, setEvent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [rsvps, setRsvps] = useState<any[]>([]);
+  const [isJoining, setIsJoining] = useState(false);
+  const [userJoined, setUserJoined] = useState(false);
 
   useEffect(() => {
-    async function fetchEvent() {
-      if (!id) return;
-      try {
-        const docRef = doc(db, "events", id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          setEvent({ id: docSnap.id, ...docSnap.data() });
-        }
-      } catch (err) {
-        console.error(err);
-      } finally {
-        setLoading(false);
+    if (!id) return;
+
+    const eventUnsub = onSnapshot(doc(db, "events", id), (snap) => {
+      if (snap.exists()) {
+        setEvent({ id: snap.id, ...snap.data() });
       }
-    }
-    fetchEvent();
+      setLoading(false);
+    });
+
+    const rsvpsUnsub = onSnapshot(collection(db, `events/${id}/rsvps`), (snap) => {
+      const rsvpData = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setRsvps(rsvpData);
+      
+      if (auth.currentUser) {
+        setUserJoined(rsvpData.some(r => r.id === auth.currentUser?.uid));
+      }
+    });
+
+    return () => {
+      eventUnsub();
+      rsvpsUnsub();
+    };
   }, [id]);
+
+  const handleRSVP = async () => {
+    if (!auth.currentUser || !id) {
+      toast("error", "Login Required", "You must be signed in to join events.");
+      return;
+    }
+
+    setIsJoining(true);
+    try {
+      if (userJoined) {
+        await deleteDoc(doc(db, `events/${id}/rsvps`, auth.currentUser.uid));
+        toast("info", "Left Event", "You have successfully unregistered from this operation.");
+      } else {
+        const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+        const userData = userDoc.exists() ? userDoc.data() : {};
+        
+        await setDoc(doc(db, `events/${id}/rsvps`, auth.currentUser.uid), {
+          username: userData.username || auth.currentUser.displayName || auth.currentUser.email?.split('@')[0],
+          skin: userData.skin || 294,
+          joinedAt: serverTimestamp()
+        });
+        toast("success", "Operation Joined", "Your participation has been logged in the mission manifest.");
+      }
+    } catch (err) {
+      console.error(err);
+      toast("error", "Protocol Error", "Failed to synchronize participation data.");
+    } finally {
+      setIsJoining(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -55,140 +98,223 @@ export default function EventDetails() {
   const status = event.status || (isExpired ? "completed" : "scheduled");
 
   return (
-    <div className="flex flex-col gap-8 max-w-4xl mx-auto">
+    <div className="flex flex-col gap-8 max-w-5xl mx-auto pb-20">
       <Link to="/events" className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-gray-600 hover:text-(--accent) transition-colors w-fit">
         <ChevronLeft size={14} /> Back to Briefings
       </Link>
 
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/5 pb-8">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-3">
-              <div className="bg-(--accent)/10 p-2 border border-(--accent)/20">
-                <Zap size={20} className="text-(--accent)" />
-              </div>
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-(--accent)">{event.type}</span>
+      {/* Hero Banner Section */}
+      <div className="relative w-full h-[300px] md:h-[400px] portal-card overflow-hidden group">
+        {event.bannerUrl ? (
+          <img 
+            src={event.bannerUrl} 
+            alt={event.title} 
+            className="w-full h-full object-cover transition-transform duration-[2000ms] group-hover:scale-105"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
+            <Zap size={120} className="text-white opacity-5" />
+          </div>
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+        
+        <div className="absolute bottom-0 left-0 right-0 p-8 md:p-12 flex flex-col md:flex-row md:items-end justify-between gap-8">
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] bg-(--accent) text-black px-3 py-1 -rotate-2">{event.type}</span>
+              {event.tags?.map((tag: string, i: number) => (
+                <span key={i} className="text-[9px] font-black uppercase tracking-widest bg-white/10 backdrop-blur-md border border-white/20 text-white px-2 py-0.5 rounded-sm">
+                  {tag}
+                </span>
+              ))}
             </div>
-            <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter italic leading-none group-hover:text-(--accent) transition-colors">
+            <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tighter italic leading-none text-white drop-shadow-2xl">
               {event.title}
             </h1>
+            <div className="flex items-center gap-6 mt-2">
+              <div className="flex items-center gap-2 text-white/60">
+                <MapPin size={16} className="text-(--accent)" />
+                <span className="text-xs font-black uppercase tracking-widest font-mono">{event.location || "Confidential"}</span>
+              </div>
+              <div className="flex items-center gap-2 text-white/60">
+                <Users size={16} className="text-(--accent)" />
+                <span className="text-xs font-black uppercase tracking-widest font-mono">{rsvps.length} Personnel Linked</span>
+              </div>
+            </div>
           </div>
 
-          <div className="flex flex-col items-end gap-2">
-            <span className="text-[9px] font-black uppercase text-gray-600 tracking-widest">Deployment Status</span>
-            {status === 'active' ? (
-              <div className="flex items-center gap-3 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-6 py-2 rounded-sm shadow-[0_0_15px_rgba(16,185,129,0.1)]">
-                <div className="w-2 h-2 bg-emerald-400 rounded-full animate-ping" />
-                <span className="text-xs font-black uppercase tracking-widest">Live Operation</span>
-              </div>
-            ) : status === 'completed' ? (
-              <div className="bg-gray-500/10 text-gray-500 border border-gray-500/30 px-6 py-2 rounded-sm">
-                <span className="text-xs font-black uppercase tracking-widest">Concluded</span>
-              </div>
-            ) : status === 'cancelled' ? (
-              <div className="bg-red-500/10 text-red-500 border border-red-500/30 px-6 py-2 rounded-sm">
-                <span className="text-xs font-black uppercase tracking-widest">Aborted</span>
-              </div>
-            ) : (
-              <div className="bg-(--accent)/10 text-(--accent) border border-(--accent)/30 px-6 py-2 rounded-sm">
-                <span className="text-xs font-black uppercase tracking-widest">Scheduled Deployment</span>
-              </div>
-            )}
+          <div className="flex flex-col items-end gap-3 self-end">
+            <div className="bg-black/60 backdrop-blur-xl border border-white/10 p-4 min-w-[200px]">
+              <span className="text-[9px] font-black uppercase text-gray-500 tracking-widest mb-2 block">Countdown to Deployment</span>
+              <Countdown targetDate={event.startTime} className="text-2xl" />
+            </div>
           </div>
         </div>
+      </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          <div className="md:col-span-2 flex flex-col gap-8">
-            <section className="portal-card overflow-hidden">
-              <div className="portal-header flex items-center gap-2">
-                <Info size={14} /> Mission Briefing
+      <div className="grid lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 flex flex-col gap-8">
+          <section className="portal-card overflow-hidden bg-black/40 backdrop-blur-md">
+            <div className="portal-header flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Info size={14} className="text-(--accent)" /> Mission Objective
               </div>
-              <div className="p-8">
-                <p className="text-gray-400 leading-relaxed italic text-lg border-l-4 border-(--accent)/50 pl-6 py-2">
-                  "{event.description || "Mission briefing classified. No further details available at this time."}"
-                </p>
-              </div>
-            </section>
+              <span className="text-[8px] font-mono opacity-30">SEC_LEVEL_4</span>
+            </div>
+            <div className="p-8 md:p-10">
+              <p className="text-gray-300 leading-relaxed italic text-xl border-l-[6px] border-(--accent)/30 pl-8 py-4 bg-white/[0.02]">
+                "{event.description || "In-depth intelligence pending. Stand by for encrypted updates."}"
+              </p>
+            </div>
+          </section>
 
-            <section className="grid grid-cols-2 gap-4">
-              <div className="portal-card bg-black/20 p-6 flex flex-col gap-2">
-                <span className="text-[10px] font-black uppercase text-gray-600 truncate tracking-widest flex items-center gap-2">
-                  <User size={12} /> Issued By
-                </span>
-                <span className="text-sm font-bold text-white">{event.creatorName || "High Command"}</span>
+          {/* Personnel List */}
+          <section className="portal-card bg-black/40">
+            <div className="portal-header flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Users size={14} className="text-(--accent)" /> Active Personnel Manifest
               </div>
-              <div className="portal-card bg-black/20 p-6 flex flex-col gap-2">
-                <span className="text-[10px] font-black uppercase text-gray-600 truncate tracking-widest flex items-center gap-2">
-                  <Shield size={12} /> Intelligence ID
-                </span>
-                <span className="text-sm font-mono text-gray-400 uppercase">{event.id.slice(0, 12)}</span>
-              </div>
-            </section>
-          </div>
-
-          <aside className="flex flex-col gap-6">
-            <div className="portal-card shadow-xl border-(--accent)/20">
-              <div className="portal-header bg-(--accent)/5 text-(--accent) flex items-center gap-2">
-                <Clock size={14} /> Deployment Timer
-              </div>
-              <div className="p-6 flex flex-col gap-6">
-                <div>
-                  <span className="text-[9px] font-black uppercase text-gray-600 tracking-widest block mb-2">Commencement Time</span>
-                  <div className="text-white font-black italic text-xl tracking-tighter">
-                    {new Date(event.startTime).toLocaleString()}
-                  </div>
+              <span className="text-[10px] font-black text-(--accent)">{rsvps.length} REGISTERED</span>
+            </div>
+            <div className="p-8">
+              {rsvps.length === 0 ? (
+                <div className="py-10 text-center border border-dashed border-white/5 bg-white/[0.01]">
+                   <Users size={32} className="mx-auto text-gray-700 mb-4" />
+                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-600 italic">Manifest is currently empty. Awaiting first volunteer.</p>
                 </div>
-                
-                {event.createdAt && (
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {rsvps.map((rsvp, i) => (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.05 }}
+                      key={rsvp.id} 
+                      className="flex items-center gap-3 p-3 bg-white/5 border border-white/5 hover:border-(--accent)/30 transition-all group"
+                    >
+                      <div className="w-10 h-10 bg-black border border-white/10 flex items-center justify-center shrink-0">
+                         {/* Static fallback for skin representation */}
+                         <div className="w-6 h-6 rounded-full bg-(--accent)/20 border border-(--accent)/40 flex items-center justify-center text-[10px] font-black group-hover:scale-110 transition-transform">
+                            {rsvp.username?.[0] || "?"}
+                         </div>
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-[11px] font-black uppercase italic text-white truncate">{rsvp.username}</span>
+                        <span className="text-[7px] text-gray-500 font-mono tracking-tighter">ID: {rsvp.id.slice(0, 8)}</span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </section>
+        </div>
+
+        <aside className="flex flex-col gap-6">
+          <div className={clsx(
+            "portal-card shadow-2xl transition-all duration-500",
+            userJoined ? "border-emerald-500/30 bg-emerald-500/5 shadow-emerald-500/5" : "border-(--accent)/30 bg-(--accent)/5 shadow-(--accent)/5"
+          )}>
+            <div className="p-8 flex flex-col gap-6">
+              <div className="flex flex-col items-center text-center gap-4">
+                {userJoined ? (
                   <>
-                    <div className="pt-4 border-t border-white/5">
-                      <span className="text-[9px] font-black uppercase text-gray-600 tracking-widest block mb-1">Intelligence Filed</span>
-                      <div className="text-gray-500 text-[10px] font-bold">
-                        {event.createdAt.toDate().toLocaleString()}
-                      </div>
+                    <div className="w-16 h-16 rounded-full bg-emerald-500 flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.3)]">
+                      <CheckCircle2 size={32} className="text-black" />
                     </div>
-                    <div className="pt-4 border-t border-white/5 flex items-center justify-between">
-                      <div className="flex flex-col">
-                        <span className="text-[9px] font-black uppercase text-gray-600 tracking-widest block mb-1">Active Personnel</span>
-                        <div className="text-(--accent) font-black italic text-lg tracking-tighter">
-                          {event.playerCount || 0} Registered
-                        </div>
-                      </div>
-                      <Users size={18} className="text-gray-700" />
+                    <div className="flex flex-col gap-1">
+                      <h3 className="text-2xl font-black uppercase italic tracking-tighter text-emerald-400">MANIFESTED</h3>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">You are cleared for deployment</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="w-16 h-16 rounded-full bg-(--accent) flex items-center justify-center shadow-[0_0_30px_rgba(242,125,38,0.3)]">
+                      <Zap size={32} className="text-black" />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <h3 className="text-2xl font-black uppercase italic tracking-tighter text-white">Join Operation</h3>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold">Register your interest now</p>
                     </div>
                   </>
                 )}
               </div>
-            </div>
 
-            <div className="portal-card">
-              <div className="portal-header flex items-center gap-2">
-                <MapPin size={14} /> Operation Area
+              <div className="flex flex-col gap-3">
+                {auth.currentUser ? (
+                  <button 
+                    disabled={isJoining || status === 'completed' || status === 'cancelled'}
+                    onClick={handleRSVP}
+                    className={clsx(
+                      "w-full py-4 text-xs font-black uppercase tracking-[0.3em] transition-all relative group h-14",
+                      userJoined 
+                        ? "bg-white/5 border border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10" 
+                        : "bg-(--accent) text-black hover:opacity-90 shadow-[0_4px_20px_rgba(242,125,38,0.2)]",
+                      (isJoining || status === 'completed' || status === 'cancelled') && "opacity-50 cursor-not-allowed grayscale"
+                    )}
+                  >
+                    {isJoining ? (
+                      <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin mx-auto" />
+                    ) : userJoined ? (
+                      "LEAVE OPERATION"
+                    ) : (
+                      "COMMENCE JOINING"
+                    )}
+                  </button>
+                ) : (
+                  <Link 
+                    to="/login"
+                    className="w-full py-4 bg-white text-black text-xs font-black uppercase tracking-[0.3em] text-center hover:bg-gray-200 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <LogIn size={16} /> LOGIN TO JOIN
+                  </Link>
+                )}
+                
+                {status === 'completed' && <p className="text-[9px] text-red-500 font-black text-center uppercase tracking-widest">Operation has concluded.</p>}
+                {status === 'cancelled' && <p className="text-[9px] text-red-500 font-black text-center uppercase tracking-widest">Operation was aborted.</p>}
               </div>
-              <div className="p-6">
-                <div className="text-white font-black uppercase italic text-lg tracking-tight">
-                  {event.location || "Location Confidential"}
+
+              <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-6">
+                <div className="flex flex-col">
+                  <span className="text-[9px] font-black uppercase text-gray-600 tracking-widest mb-1">Status</span>
+                  <span className={clsx(
+                    "text-xs font-black uppercase italic",
+                    status === 'active' ? "text-emerald-400" : "text-(--accent)"
+                  )}>{status}</span>
                 </div>
-                <p className="text-[10px] text-gray-500 font-bold uppercase mt-1 tracking-widest">San Andreas District</p>
+                <div className="flex flex-col items-end">
+                  <span className="text-[9px] font-black uppercase text-gray-600 tracking-widest mb-1">Prize</span>
+                  <span className="text-xs font-black uppercase italic text-white truncate max-w-full">{event.prize || "Glory"}</span>
+                </div>
               </div>
             </div>
+          </div>
 
-            {event.prize && (
-              <div className="portal-card border-emerald-500/20 shadow-[0_10px_30px_rgba(16,185,129,0.05)]">
-                <div className="portal-header bg-emerald-500/5 text-emerald-400 flex items-center gap-2">
-                  <Trophy size={14} /> Reward Pool
+          <div className="portal-card">
+            <div className="portal-header flex items-center gap-2">
+              <Clock size={14} /> Briefing History
+            </div>
+            <div className="p-6 flex flex-col gap-4">
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase text-gray-600 tracking-widest block mb-1">Commencement</span>
+                <div className="text-white font-mono text-xs">
+                  {new Date(event.startTime).toLocaleString()}
                 </div>
-                <div className="p-6">
-                  <div className="text-emerald-400 font-black italic text-2xl tracking-tighter drop-shadow-sm">
-                    {event.prize}
+              </div>
+              {event.createdAt && (
+                <div className="pt-4 border-t border-white/5 flex flex-col">
+                  <span className="text-[9px] font-black uppercase text-gray-600 tracking-widest block mb-1">Intel Logged</span>
+                  <div className="text-gray-500 font-mono text-[10px]">
+                    {event.createdAt.toDate().toLocaleString()}
                   </div>
-                  <p className="text-[9px] text-gray-600 font-black uppercase mt-1 tracking-widest">Authorized Compensation</p>
                 </div>
-              </div>
-            )}
-          </aside>
-        </div>
+              )}
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
 }
+

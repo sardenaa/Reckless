@@ -106,6 +106,19 @@ service cloud.firestore {
              data.createdAt == request.time;
     }
 
+    function isValidEvent(data) {
+      return data.title is string && data.title.size() >= 3 && data.title.size() <= 100 &&
+             data.type is string &&
+             data.startTime is string &&
+             (data.get('description', null) == null || data.description is string) &&
+             (data.get('location', null) == null || data.location is string) &&
+             (data.get('prize', null) == null || data.prize is string) &&
+             (data.get('playerCount', null) == null || data.playerCount is number) &&
+             (data.get('status', null) == null || data.status in ['scheduled', 'active', 'completed', 'cancelled']) &&
+             (data.get('tags', null) == null || data.tags is list) &&
+             (data.get('bannerUrl', null) == null || data.bannerUrl is string);
+    }
+
     // --- Collections ---
 
     // Connectivity Test
@@ -214,7 +227,12 @@ service cloud.firestore {
     // Events
     match /events/{id} {
       allow read: if true;
-      allow write: if isStaff();
+      allow write: if isStaff() && isValidEvent(incoming());
+
+      match /rsvps/{userId} {
+        allow read: if true;
+        allow write: if isOwner(userId) && isNotBanned();
+      }
     }
 
     match /event_categories/{id} {
